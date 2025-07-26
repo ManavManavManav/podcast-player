@@ -1,30 +1,33 @@
-'use client';
+"use client";
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import Cookies from 'js-cookie';
-import Image from 'next/image';
-import { useUserStore } from '@/lib/store/useUserStore';
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import Cookies from "js-cookie";
+import Image from "next/image";
+import { useUserStore } from "@/lib/store/useUserStore";
 
 export default function TopBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeQuery = searchParams.get('q');
+  const activeQuery = searchParams.get("q");
 
   const { username, logout } = useUserStore();
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
   // Load search history on first render
   useEffect(() => {
-    const stored = Cookies.get('recentSearches');
+    const stored = Cookies.get("recentSearches");
     if (stored) setRecentSearches(JSON.parse(stored));
   }, []);
 
   const saveSearch = (term: string) => {
-    const updated = [term, ...recentSearches.filter(q => q !== term)].slice(0, 4);
-    Cookies.set('recentSearches', JSON.stringify(updated), { expires: 7 });
+    const updated = [term, ...recentSearches.filter((q) => q !== term)].slice(
+      0,
+      4
+    );
+    Cookies.set("recentSearches", JSON.stringify(updated), { expires: 7 });
     setRecentSearches(updated);
   };
 
@@ -34,22 +37,25 @@ export default function TopBar() {
     if (!trimmed) return;
 
     saveSearch(trimmed);
-    router.push(`/?q=${encodeURIComponent(trimmed)}`);
-    setQuery('');
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    setQuery("");
     setShowDropdown(false);
   };
 
   const handleSelectRecent = (term: string) => {
     saveSearch(term);
-    router.push(`/?q=${encodeURIComponent(term)}`);
-    setQuery('');
+    router.push(`/search?q=${encodeURIComponent(term)}`);
+    setQuery("");
     setShowDropdown(false);
   };
 
   return (
     <div className="sticky top-0 z-50 w-full bg-white/80 dark:bg-black/60 backdrop-blur-md border-b border-black/10 dark:border-white/10 px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 relative">
       {/* Home Button */}
-      <button onClick={() => router.push('/')} className="text-sm font-medium hover:underline">
+      <button
+        onClick={() => router.push("/")}
+        className="text-sm font-medium hover:underline"
+      >
         Home
       </button>
 
@@ -89,7 +95,10 @@ export default function TopBar() {
       {/* Profile + Logout */}
       <div className="flex items-center gap-3">
         <span className="text-sm hidden sm:inline">{username}</span>
-        <button onClick={logout} className="text-sm font-medium hover:underline">
+        <button
+          onClick={logout}
+          className="text-sm font-medium hover:underline"
+        >
           Logout
         </button>
       </div>
