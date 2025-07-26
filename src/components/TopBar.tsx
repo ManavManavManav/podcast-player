@@ -3,15 +3,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
-import Image from "next/image";
-import { useUserStore } from "@/lib/store/useUserStore";
 
 export default function TopBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeQuery = searchParams.get("q");
-
-  const { username, logout } = useUserStore();
   const [query, setQuery] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -90,17 +86,6 @@ export default function TopBar() {
             ))}
           </ul>
         )}
-      </div>
-
-      {/* Profile + Logout */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm hidden sm:inline">{username}</span>
-        <button
-          onClick={logout}
-          className="text-sm font-medium hover:underline"
-        >
-          Logout
-        </button>
       </div>
     </div>
   );
