@@ -98,7 +98,7 @@ export default function ShowPage() {
 
   const ringRadius = 18;
   const stroke = 2;
-  const normalizedRadius = ringRadius - stroke * 0.5;
+  const normalizedRadius = ringRadius - stroke ;
   const circumference = normalizedRadius * 2 * Math.PI;
 
   if (loading) return <p className="p-8">Loading show...</p>;
