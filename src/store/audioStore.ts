@@ -10,7 +10,7 @@ type Episode = {
 interface AudioState {
   currentEpisode: Episode | null;
   progress: number; // value between 0 and 1
-  setCurrentEpisode: (ep: Episode) => void;
+  setCurrentEpisode: (ep: Episode | null) => void;
   setProgress: (progress: number) => void;
 }
 
