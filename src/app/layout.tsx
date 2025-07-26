@@ -3,7 +3,8 @@ import './globals.css';
 import TopBar from '@/components/TopBar';
 import { Inter } from 'next/font/google';
 import { Metadata } from 'next';
-import AudioPlayer from '@/components/AudioPlayer';
+import AudioPlayerBar from "@/components/AudioPlayerBar"; // adjust path if needed
+
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,7 +23,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen font-sans bg-white dark:bg-black text-black dark:text-white flex flex-col`}>
         <TopBar />
         <main className="flex-1 overflow-y-auto px-6 py-8">{children}</main>
-        <AudioPlayer />
+        <AudioPlayerBar />
       </body>
     </html>
   );
