@@ -10,7 +10,10 @@ export default function ShowPage() {
   const [showData, setShowData] = useState<any>(null);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
   const setCurrentEpisode = useAudioStore((state) => state.setCurrentEpisode);
+  const currentEpisode = useAudioStore((state) => state.currentEpisode);
+  const progress = useAudioStore((state) => state.progress);
 
   useEffect(() => {
     const fetchShow = async () => {
@@ -63,7 +66,9 @@ export default function ShowPage() {
       <h2 className="text-xl font-semibold mb-4">Recent Episodes</h2>
       <ul className="space-y-4">
         {episodes.map((ep) => {
-          const offset = circumference - 0 * circumference;
+          const isCurrent = currentEpisode?.id === ep.id;
+          const percent = isCurrent ? progress : 0;
+          const offset = circumference - percent * circumference;
 
           return (
             <li

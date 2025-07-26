@@ -9,10 +9,14 @@ type Episode = {
 
 interface AudioState {
   currentEpisode: Episode | null;
+  progress: number; // value between 0 and 1
   setCurrentEpisode: (ep: Episode) => void;
+  setProgress: (progress: number) => void;
 }
 
 export const useAudioStore = create<AudioState>((set) => ({
   currentEpisode: null,
-  setCurrentEpisode: (ep) => set({ currentEpisode: ep }),
+  progress: 0,
+  setCurrentEpisode: (ep) => set({ currentEpisode: ep, progress: 0 }),
+  setProgress: (progress) => set({ progress }),
 }));

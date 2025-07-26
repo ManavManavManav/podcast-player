@@ -22,6 +22,7 @@ export default function AudioPlayerBar() {
     const audio = audioRef.current;
     if (audio && audio.duration > 0) {
       setProgress(audio.currentTime / audio.duration);
+      useAudioStore.getState().setProgress(audio.currentTime / audio.duration);
     }
   };
 
