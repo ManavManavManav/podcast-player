@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function SearchPage() {
   const [results, setResults] = useState<any[]>([]);
@@ -50,12 +51,11 @@ export default function SearchPage() {
               </div>
             </div>
             <div className="p-4 border-t border-black/5 dark:border-white/10 text-right">
-              <button
-                className="text-sm font-medium text-blue-600 hover:underline"
-                onClick={() => (window.location.href = `/show/${feed.id}`)}
-              >
-                View Episodes →
-              </button>
+              <Link href={`/show/${feed.id}`}>
+                <div className="text-sm font-medium text-blue-600 hover:underline">
+                  View episodes →
+                </div>
+              </Link>
             </div>
           </li>
         ))}
