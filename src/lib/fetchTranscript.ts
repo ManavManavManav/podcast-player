@@ -1,11 +1,21 @@
 // fetchTranscript.ts
 
+let activeAbortController: AbortController | null = null;
+
 export async function fetchTranscriptChunk(url: string, start: number): Promise<string> {
+  // Cancel any ongoing request if a new one is triggered (e.g., scrubbing)
+  if (activeAbortController) {
+    activeAbortController.abort();
+  }
+
+  activeAbortController = new AbortController();
+
   const res = await fetch("/api/transcribe", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
+    signal: activeAbortController.signal,
     body: JSON.stringify({ url, start }),
   });
 
@@ -20,7 +30,5 @@ export async function fetchTranscriptChunk(url: string, start: number): Promise<
     console.warn("⚠️ No transcript returned in response:", data);
     throw new Error("Transcript data missing");
   }
-
-  console.log(`✅ Received chunk for ${start}s`, data.transcript.slice(0, 200));
   return data.transcript;
 }
