@@ -2,12 +2,26 @@
 
 let activeAbortController: AbortController | null = null;
 
-export async function fetchTranscriptChunk(url: string, start: number): Promise<string> {
-  // Cancel any ongoing request if a new one is triggered (e.g., scrubbing)
+/**
+ * Cancels any in-progress transcription fetch.
+ */
+export function cancelTranscriptFetch() {
   if (activeAbortController) {
     activeAbortController.abort();
+    activeAbortController = null;
+    console.log("🛑 Transcription fetch aborted");
   }
+}
 
+/**
+ * Fetches a transcript chunk from the API.
+ * Automatically cancels any previous fetch.
+ */
+export async function fetchTranscriptChunk(
+  url: string,
+  start: number
+): Promise<string> {
+  cancelTranscriptFetch(); // abort previous if still running
   activeAbortController = new AbortController();
 
   const res = await fetch("/api/transcribe", {
@@ -30,5 +44,6 @@ export async function fetchTranscriptChunk(url: string, start: number): Promise<
     console.warn("⚠️ No transcript returned in response:", data);
     throw new Error("Transcript data missing");
   }
+
   return data.transcript;
 }

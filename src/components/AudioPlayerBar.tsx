@@ -1,14 +1,18 @@
-// PATCHED AudioPlayerBar.tsx to transcribe live in 30s chunks
-
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useAudioStore } from "@/store/audioStore";
 import { useTranscriptionStore } from "@/store/transcriptionStore";
-import { fetchTranscriptChunk } from "@/lib/fetchTranscript";
+import { fetchTranscriptChunk, cancelTranscriptFetch } from "@/lib/fetchTranscript";
 
-const CHUNK_SIZE = 30;
-const PREFETCH_MARGIN = 10;
+const CHUNK_SIZE = 300;
+const PREFETCH_MARGIN = 20;
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
 
 export default function AudioPlayerBar() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -19,6 +23,9 @@ export default function AudioPlayerBar() {
   const [sleepTimer, setSleepTimer] = useState<NodeJS.Timeout | null>(null);
   const [sleepTimerActive, setSleepTimerActive] = useState(false);
   const [loadingChunk, setLoadingChunk] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const {
     visible,
@@ -33,15 +40,20 @@ export default function AudioPlayerBar() {
 
   const seenChunks = useRef<Set<number>>(new Set());
   const latestChunkRequested = useRef<number | null>(null);
-  const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!currentEpisode || !audioRef.current) return;
 
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(0);
+
     const audio = audioRef.current;
     audio.src = currentEpisode.enclosureUrl;
-    audio.play();
+    audio.load();
     audio.volume = volume;
+    audio.play();
+    setIsPlaying(true);
   }, [currentEpisode]);
 
   useEffect(() => {
@@ -53,20 +65,47 @@ export default function AudioPlayerBar() {
     };
   }, []);
 
+  useEffect(() => {
+    let raf: number;
+
+    const updateProgress = () => {
+      const audio = audioRef.current;
+      if (audio && !audio.paused && !audio.ended && !isNaN(audio.duration)) {
+        const prog = audio.currentTime / audio.duration;
+        setCurrentTime(audio.currentTime);
+        setProgress(prog);
+        raf = requestAnimationFrame(updateProgress);
+      }
+    };
+
+    if (isPlaying) {
+      raf = requestAnimationFrame(updateProgress);
+    }
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [isPlaying]);
+
   const handleTimeUpdate = async () => {
     const audio = audioRef.current;
     if (!audio || !visible) return;
 
     const currentTime = audio.currentTime;
     const currentChunkStart = Math.floor(currentTime / CHUNK_SIZE) * CHUNK_SIZE;
+    const prefetchTime = currentChunkStart + CHUNK_SIZE - PREFETCH_MARGIN;
 
-    // Wait if chunk isn't ready yet
-    if (!seenChunks.current.has(currentChunkStart)) {
+    if (
+      !seenChunks.current.has(currentChunkStart) &&
+      currentTime >= prefetchTime
+    ) {
       if (!loadingChunk) {
         seenChunks.current.add(currentChunkStart);
         setLoadingChunk(true);
         setLoading(true);
         latestChunkRequested.current = currentChunkStart;
+
+        cancelTranscriptFetch();
 
         try {
           const text = await fetchTranscriptChunk(
@@ -76,7 +115,10 @@ export default function AudioPlayerBar() {
           if (latestChunkRequested.current === currentChunkStart) {
             setChunk(currentChunkStart, text);
             setText(text);
-            audio.play();
+            if (audio.paused) {
+              audio.play();
+              setIsPlaying(true);
+            }
           }
         } catch (err) {
           console.error("Transcript error:", err);
@@ -89,7 +131,6 @@ export default function AudioPlayerBar() {
       }
     }
 
-    // Highlight current chunk
     const chunks = Array.from(chunkMap.entries()).sort(([a], [b]) => a - b);
     const html = chunks
       .map(([start, val]) => {
@@ -102,21 +143,25 @@ export default function AudioPlayerBar() {
       .join("\n");
     setText(html);
 
-    const newProgress = audio.currentTime / audio.duration;
-    setProgress(newProgress);
-    useAudioStore.getState().setProgress(newProgress);
+    if (!isNaN(audio.duration) && audio.duration > 0) {
+      const prog = audio.currentTime / audio.duration;
+      setProgress(prog);
+      setCurrentTime(audio.currentTime);
+      setDuration(audio.duration);
+      useAudioStore.getState().setProgress(prog);
+    }
   };
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const audio = audioRef.current;
-    if (audio) {
-      const newTime = parseFloat(e.target.value) * audio.duration;
+    if (audio && audio.duration) {
+      const newProgress = parseFloat(e.target.value);
+      const newTime = newProgress * audio.duration;
       audio.currentTime = newTime;
+      setCurrentTime(newTime);
+      setProgress(newProgress);
       seenChunks.current.clear();
-
-      if (abortController.current) {
-        abortController.current.abort();
-      }
+      cancelTranscriptFetch();
     }
   };
 
@@ -124,6 +169,7 @@ export default function AudioPlayerBar() {
     toggleVisible();
     clear();
     seenChunks.current.clear();
+    cancelTranscriptFetch();
   };
 
   const skipBack = () => {
@@ -135,12 +181,15 @@ export default function AudioPlayerBar() {
   };
 
   const togglePause = () => {
-    if (!loadingChunk) {
-      if (audioRef.current?.paused) {
-        audioRef.current.play();
-      } else {
-        audioRef.current?.pause();
-      }
+    const audio = audioRef.current;
+    if (!audio || loadingChunk) return;
+
+    if (audio.paused) {
+      audio.play();
+      setIsPlaying(true);
+    } else {
+      audio.pause();
+      setIsPlaying(false);
     }
   };
 
@@ -150,6 +199,7 @@ export default function AudioPlayerBar() {
       audioRef.current.currentTime = 0;
     }
     useAudioStore.getState().setCurrentEpisode(null);
+    cancelTranscriptFetch();
   };
 
   const toggleSleepTimer = () => {
@@ -174,10 +224,13 @@ export default function AudioPlayerBar() {
   if (!currentEpisode) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-gray-300 dark:border-gray-700 shadow-lg">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm border-t border-gray-300 dark:border-gray-700 shadow-lg">
       <div className="max-w-5xl mx-auto px-5 py-3 grid gap-4 items-center">
         {visible && (
-          <div className="col-span-1 sm:col-span-1 text-xs overflow-x-auto max-h-48 p-2 border bg-gray-50 dark:bg-zinc-800" style={{ height: '150px' }}>
+          <div
+            className="col-span-4 sm:col-span-4 w-full text-xs overflow-x-auto rounded max-h-48 p-2 border bg-gray-50 dark:bg-zinc-800"
+            style={{ height: "150px" }}
+          >
             <div
               className="whitespace-pre-line text-gray-800 dark:text-gray-200"
               dangerouslySetInnerHTML={{ __html: text }}
@@ -202,23 +255,29 @@ export default function AudioPlayerBar() {
 
           <input
             type="range"
-            value={progress}
+            value={isNaN(progress) ? 0 : progress}
             onChange={handleScrub}
             step="0.01"
             min="0"
             max="1"
             className="w-full accent-blue-500"
           />
+          <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+            {formatTime(currentTime)} / {formatTime(duration)}
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex gap-2">
               <button onClick={skipBack}>⏪</button>
-              <button onClick={togglePause}>{audioRef.current?.paused ? "▶️" : "⏸️"}</button>
+              <button onClick={togglePause}>{isPlaying ? "⏸️" : "▶️"}</button>
               <button onClick={skipForward}>⏩</button>
             </div>
 
             <div className="flex items-center gap-2">
-              <label htmlFor="volume" className="text-xs text-gray-600 dark:text-gray-300">
+              <label
+                htmlFor="volume"
+                className="text-xs text-gray-600 dark:text-gray-300"
+              >
                 🔉
               </label>
               <input
@@ -238,19 +297,32 @@ export default function AudioPlayerBar() {
             </div>
 
             <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-              ⏲️
               <input
                 type="number"
                 value={sleepInput}
                 onChange={(e) => setSleepInput(e.target.value)}
                 className="w-16 px-1 py-0.5 text-xs rounded border border-gray-400 dark:border-gray-600 bg-white dark:bg-zinc-800"
               />
-              <button onClick={toggleSleepTimer}>{sleepTimerActive ? "🟣" : "⚪"}</button>
+              <button onClick={toggleSleepTimer}>
+                {sleepTimerActive ? "🟣" : "⚪"}
+              </button>
             </div>
           </div>
         </div>
 
-        <audio ref={audioRef} onTimeUpdate={handleTimeUpdate} hidden />
+        <audio
+          ref={audioRef}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={() => {
+            if (audioRef.current) {
+              setDuration(audioRef.current.duration);
+              setCurrentTime(audioRef.current.currentTime);
+            }
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          hidden
+        />
       </div>
     </div>
   );

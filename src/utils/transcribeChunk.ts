@@ -25,8 +25,8 @@ export async function transcribeChunk(filePath: string): Promise<string> {
       console.log("Whisper stdout:", data.toString());
     });
 
-    whisper.stderr.on("data", (data) => {
-      console.error("Whisper stderr:", data.toString());
+    whisper.stderr?.on("data", (data) => {
+      //console.error("Whisper stderr:", data.toString());
     });
 
     whisper.on("error", (err) => {

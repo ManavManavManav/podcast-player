@@ -73,10 +73,15 @@ export default function ShowPage() {
           return (
             <li
               key={ep.id}
-              className="border rounded-md p-4 flex items-center justify-between gap-4"
+              onClick={() => setCurrentEpisode(ep)}
+              className={`relative group cursor-pointer border rounded-md p-4 flex items-center justify-between gap-4 transition-colors duration-200 ${
+                isCurrent
+                  ? "ring-2 ring-green-500 dark:ring-green-400 bg-blue-50/50 dark:bg-zinc-800/50 backdrop-blur-sm"
+                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+              }`}
             >
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm text-blue-600 cursor-pointer underline">
+                <h3 className="font-medium text-sm text-black dark:text-white group-hover:text-blue-600 transition-colors">
                   {ep.title}
                 </h3>
                 <p className="text-xs text-gray-500">
@@ -84,48 +89,15 @@ export default function ShowPage() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setCurrentEpisode(ep)}
-                className="relative w-12 h-12 shrink-0"
-              >
+              <div className="relative w-10 h-10 shrink-0">
                 <svg
                   height="100%"
                   width="100%"
                   viewBox="0 0 36 36"
                   className="absolute top-0 left-0"
                 >
-                  <circle
-                    stroke="#e5e7eb"
-                    fill="transparent"
-                    strokeWidth="2"
-                    r="16"
-                    cx="18"
-                    cy="18"
-                  />
-                  <circle
-                    stroke="#3b82f6"
-                    fill="transparent"
-                    strokeWidth="2"
-                    strokeDasharray={2 * Math.PI * 16}
-                    strokeDashoffset={offset}
-                    strokeLinecap="round"
-                    r="16"
-                    cx="18"
-                    cy="18"
-                    style={{
-                      transition: "stroke-dashoffset 0.25s linear",
-                      transform: "rotate(-90deg)",
-                      transformOrigin: "center",
-                    }}
-                  />
                 </svg>
-
-                <div className="absolute inset-0 flex items-center justify-center z-10">
-                  <span className="text-xs font-bold text-black dark:text-white">
-                    ▶
-                  </span>
-                </div>
-              </button>
+              </div>
             </li>
           );
         })}
