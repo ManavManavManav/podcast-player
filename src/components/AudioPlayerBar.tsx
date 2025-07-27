@@ -266,18 +266,15 @@ export default function AudioPlayerBar() {
             {formatTime(currentTime)} / {formatTime(duration)}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row sm:justify-between items-center gap-3 sm:gap-2 w-full">
+            <div className="flex flex-row gap-2 mb-2 sm:mb-0">
               <button onClick={skipBack}>⏪</button>
               <button onClick={togglePause}>{isPlaying ? "⏸️" : "▶️"}</button>
               <button onClick={skipForward}>⏩</button>
             </div>
 
             <div className="flex items-center gap-2">
-              <label
-                htmlFor="volume"
-                className="text-xs text-gray-600 dark:text-gray-300"
-              >
+              <label htmlFor="volume" className="text-xs text-gray-600 dark:text-gray-300">
                 🔉
               </label>
               <input
@@ -317,6 +314,7 @@ export default function AudioPlayerBar() {
             if (audioRef.current) {
               setDuration(audioRef.current.duration);
               setCurrentTime(audioRef.current.currentTime);
+              handleTimeUpdate(); // force-fetch initial transcript
             }
           }}
           onPlay={() => setIsPlaying(true)}

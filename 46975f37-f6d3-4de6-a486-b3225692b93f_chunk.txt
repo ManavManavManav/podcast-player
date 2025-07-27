@@ -1,0 +1,9 @@
+these waves, they have to become so great that the laws of physics that they're governed
+by are no longer wave equations, but something more complicated and nonlinear.
+And so in mathematical physics, we care a lot about whether certain equations in wave
+equations are stable or not, whether they can create these singularities.
+There's a famous, I saw a problem called the Navier Stokes-Rigularity problem.
+So the Navier Stokes equations, equations that govern a fluid flow or incompressible
+fluid is like water.
+The question asks, if you start with a smooth velocity field of water, can it ever constrict
+that you're going to have a smooth velocity field of water, can you start with a smooth velocity field of water, can you start with a smooth velocity field of water, can you start with a smooth velocity field of water, can you start with a smooth velocity field of water, can you start
