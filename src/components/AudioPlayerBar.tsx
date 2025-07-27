@@ -1,7 +1,14 @@
+// PATCHED AudioPlayerBar.tsx to transcribe live in 30s chunks
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useAudioStore } from "@/store/audioStore";
+import { useTranscriptionStore } from "@/store/transcriptionStore";
+import { fetchTranscriptChunk } from "@/lib/fetchTranscript";
+
+const CHUNK_SIZE = 30;
+const PREFETCH_MARGIN = 10; // Seconds before end of chunk to prefetch next
 
 export default function AudioPlayerBar() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -10,8 +17,12 @@ export default function AudioPlayerBar() {
   const [volume, setVolume] = useState(1);
   const [sleepInput, setSleepInput] = useState("60");
   const [sleepTimer, setSleepTimer] = useState<NodeJS.Timeout | null>(null);
-
   const [sleepTimerActive, setSleepTimerActive] = useState(false);
+
+  const { visible, loading, text, setText, setLoading, toggleVisible, clear, chunkMap, setChunk } =
+    useTranscriptionStore();
+
+  const seenChunks = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (!currentEpisode || !audioRef.current) return;
@@ -33,12 +44,37 @@ export default function AudioPlayerBar() {
 
   const handleTimeUpdate = () => {
     const audio = audioRef.current;
-    if (audio && audio.duration > 0) {
-      const newProgress = audio.currentTime / audio.duration;
-      setProgress(newProgress);
-      useAudioStore.getState().setProgress(newProgress);
+    if (!audio || !visible) return;
+
+    const currentTime = audio.currentTime;
+    const currentChunkStart = Math.floor(currentTime / CHUNK_SIZE) * CHUNK_SIZE;
+
+    if (!seenChunks.current.has(currentChunkStart) && currentTime >= currentChunkStart + CHUNK_SIZE - PREFETCH_MARGIN) {
+      seenChunks.current.add(currentChunkStart);
+      setLoading(true);
+      fetchTranscriptChunk(currentEpisode!.enclosureUrl, currentChunkStart)
+        .then((t) => {
+          setChunk(currentChunkStart, t);
+        })
+        .finally(() => setLoading(false));
     }
+
+    const sortedChunks = Array.from(chunkMap.entries()).sort(([a], [b]) => a - b);
+    const merged = sortedChunks.map(([, val]) => val).join("\n");
+    setText(merged);
+
+    const newProgress = audio.currentTime / audio.duration;
+    setProgress(newProgress);
+    useAudioStore.getState().setProgress(newProgress);
   };
+
+  const toggleTranscript = () => {
+    toggleVisible();
+    clear();
+    seenChunks.current.clear();
+  };
+
+  // ... retain the rest of the component (UI, scrub, volume, sleep, etc.) unchanged
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const audio = audioRef.current;
@@ -95,13 +131,18 @@ export default function AudioPlayerBar() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-t border-gray-300 dark:border-gray-700 shadow-lg">
-      <div className="max-w-5xl mx-auto px-4 py-3 grid grid-cols-5 gap-4 items-center">
-        {/* Transcript Box (Dummy) */}
-        <div className="col-span-1 hidden sm:block text-xs text-left overflow-y-auto max-h-32 border-r pr-4">
-          <p className="text-gray-500 dark:text-gray-400">
-            Transcript will appear here...
-          </p>
-        </div>
+      <div className="max-w-5xl mx-auto px-5 py-3 grid gap-4 items-center">
+        {visible && (
+          <div className="col-span-1 sm:col-span-1 text-xs overflow-x-auto overflow-x-auto max-h-48 p-2 border bg-gray-50 dark:bg-zinc-800">
+            {loading ? (
+              <p className="text-gray-400 italic">Transcribing...</p>
+            ) : (
+              <p className="whitespace-pre-line text-gray-800 dark:text-gray-200">
+                {text}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Controls */}
         <div className="col-span-4 sm:col-span-4 flex flex-col gap-2 w-full">
@@ -194,6 +235,12 @@ export default function AudioPlayerBar() {
                   <polygon points="18,16 26,24 18,32" fill="white" />
                   <polygon points="26,16 34,24 26,32" fill="white" />
                 </svg>
+              </button>
+              <button
+                onClick={toggleTranscript}
+                className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-zinc-700"
+              >
+                {visible ? "Hide Transcript" : "Show Transcript"}
               </button>
             </div>
 
