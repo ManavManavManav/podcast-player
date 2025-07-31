@@ -158,16 +158,46 @@ export default function AudioPlayerBar() {
     }
 
     const chunks = Array.from(chunkMap.entries()).sort(([a], [b]) => a - b);
-    const html = chunks
-      .map(([start, val]) => {
-        const end = start + CHUNK_SIZE;
-        if (currentTime >= start && currentTime < end) {
-          return `<mark>${val}</mark>`;
-        }
-        return val;
-      })
-      .join("\n");
-    setText(html);
+    // === Keywords setup ===
+    const keywordList = [
+      ".com",
+      "sponsored",
+      "brought to you by",
+      "advertisement",
+      "promo code",
+      "our partners",
+    ];
+
+    let displayedHTML = "";
+    let currentChunkText = "";
+
+    chunks.forEach(([start, val]) => {
+      const end = start + CHUNK_SIZE;
+      if (currentTime >= start && currentTime < end) {
+        currentChunkText = val;
+        displayedHTML = val
+          .split("\n")
+          .map((line) =>
+            line.trim().length === 0
+              ? ""
+              : `<span style="background-color: yellow;">${line}</span>`
+          )
+          .join("\n");
+      }
+    });
+
+    setText(displayedHTML);
+
+    // === Keyword skipping ===
+    if (
+      currentChunkText &&
+      keywordList.some((kw) =>
+        currentChunkText.toLowerCase().includes(kw.toLowerCase())
+      )
+    ) {
+      const newTime = Math.min(audio.currentTime + 15, audio.duration);
+      audio.currentTime = newTime;
+    }
 
     if (!isNaN(audio.duration) && audio.duration > 0) {
       const prog = audio.currentTime / audio.duration;
