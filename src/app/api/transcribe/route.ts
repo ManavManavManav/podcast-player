@@ -1,5 +1,3 @@
-// app/api/transcribe/route.ts
-
 import { downloadFile } from "@/utils/downloadFile";
 import { chunkAudio } from "@/utils/chunkAudio";
 import { transcribeChunk } from "@/utils/transcribeChunk";
@@ -8,6 +6,7 @@ import os from "os";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { NextRequest, NextResponse } from "next/server";
+
 export async function POST(req: NextRequest) {
   const tempDir = path.join(os.tmpdir(), "chunks");
   await fs.mkdir(tempDir, { recursive: true });
@@ -34,15 +33,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ transcript });
   } catch (err: any) {
-    if (err.name === "AbortError") {
+    if (err.name === "AbortError" || err.message === "Aborted Whisper process") {
       console.log("🛑 Aborted transcription");
+      return NextResponse.json({ error: "Transcription aborted" }, { status: 499 }); // 499 = Client Closed Request
     } else {
       console.error("❌ Transcription error:", err);
+      return NextResponse.json(
+        { error: "Internal Server Error" },
+        { status: 500 }
+      );
     }
-    return NextResponse.json(
-      { error: "Internal Server Error" },
-      { status: 500 }
-    );
   } finally {
     // Clean up temp files even on error or abort
     fs.unlink(audioPath).catch(() => {});

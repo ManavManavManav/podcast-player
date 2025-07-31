@@ -3,9 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useAudioStore } from "@/store/audioStore";
 import { useTranscriptionStore } from "@/store/transcriptionStore";
-import { fetchTranscriptChunk, cancelTranscriptFetch } from "@/lib/fetchTranscript";
+import {
+  fetchTranscriptChunk,
+  cancelTranscriptFetch,
+} from "@/lib/fetchTranscript";
 
-const CHUNK_SIZE = 300;
+const CHUNK_SIZE = 30;
 const PREFETCH_MARGIN = 20;
 
 function formatTime(seconds: number): string {
@@ -93,11 +96,13 @@ export default function AudioPlayerBar() {
 
     const currentTime = audio.currentTime;
     const currentChunkStart = Math.floor(currentTime / CHUNK_SIZE) * CHUNK_SIZE;
-    const prefetchTime = currentChunkStart + CHUNK_SIZE - PREFETCH_MARGIN;
+    const nextChunkStart = currentChunkStart + CHUNK_SIZE;
+    const prefetchTriggerTime = nextChunkStart - PREFETCH_MARGIN;
 
+    // --- Load current chunk if not seen ---
     if (
       !seenChunks.current.has(currentChunkStart) &&
-      currentTime >= prefetchTime
+      currentTime >= currentChunkStart
     ) {
       if (!loadingChunk) {
         seenChunks.current.add(currentChunkStart);
@@ -114,7 +119,6 @@ export default function AudioPlayerBar() {
           );
           if (latestChunkRequested.current === currentChunkStart) {
             setChunk(currentChunkStart, text);
-            setText(text);
             if (audio.paused) {
               audio.play();
               setIsPlaying(true);
@@ -128,6 +132,28 @@ export default function AudioPlayerBar() {
         }
       } else {
         audio.pause();
+      }
+    }
+
+    // --- Prefetch next chunk if near the end of current chunk ---
+    if (
+      !seenChunks.current.has(nextChunkStart) &&
+      currentTime >= prefetchTriggerTime &&
+      !loadingChunk
+    ) {
+      seenChunks.current.add(nextChunkStart);
+      latestChunkRequested.current = nextChunkStart;
+
+      try {
+        const text = await fetchTranscriptChunk(
+          currentEpisode!.enclosureUrl,
+          nextChunkStart
+        );
+        if (latestChunkRequested.current === nextChunkStart) {
+          setChunk(nextChunkStart, text);
+        }
+      } catch (err) {
+        console.error("Transcript prefetch error:", err);
       }
     }
 
@@ -165,11 +191,40 @@ export default function AudioPlayerBar() {
     }
   };
 
-  const toggleTranscript = () => {
+  const toggleTranscript = async () => {
     toggleVisible();
     clear();
     seenChunks.current.clear();
     cancelTranscriptFetch();
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const time = audio.currentTime;
+    const chunkStart = Math.floor(time / CHUNK_SIZE) * CHUNK_SIZE;
+
+    if (!seenChunks.current.has(chunkStart)) {
+      setLoading(true);
+      setLoadingChunk(true);
+      seenChunks.current.add(chunkStart);
+      latestChunkRequested.current = chunkStart;
+
+      try {
+        const text = await fetchTranscriptChunk(
+          currentEpisode!.enclosureUrl,
+          chunkStart
+        );
+        if (latestChunkRequested.current === chunkStart) {
+          setChunk(chunkStart, text);
+          handleTimeUpdate(); // let it update `setText` properly
+        }
+      } catch (err) {
+        console.error("Transcript error:", err);
+      } finally {
+        setLoading(false);
+        setLoadingChunk(false);
+      }
+    }
   };
 
   const skipBack = () => {
@@ -274,7 +329,10 @@ export default function AudioPlayerBar() {
             </div>
 
             <div className="flex items-center gap-2">
-              <label htmlFor="volume" className="text-xs text-gray-600 dark:text-gray-300">
+              <label
+                htmlFor="volume"
+                className="text-xs text-gray-600 dark:text-gray-300"
+              >
                 🔉
               </label>
               <input
@@ -314,7 +372,6 @@ export default function AudioPlayerBar() {
             if (audioRef.current) {
               setDuration(audioRef.current.duration);
               setCurrentTime(audioRef.current.currentTime);
-              handleTimeUpdate(); // force-fetch initial transcript
             }
           }}
           onPlay={() => setIsPlaying(true)}

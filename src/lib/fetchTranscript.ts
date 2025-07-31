@@ -51,7 +51,7 @@ export async function fetchTranscriptChunk(url: string, start: number): Promise<
     if (err.name === "AbortError") {
       console.info("🛑 Transcript fetch aborted");
     } else {
-      throw err;
+      console.error("Tranascript error: ",err);
     }
     return ""; // or throw if you want to signal failure upward
   }
