@@ -1,3 +1,4 @@
+/* eslint-disable  @typescript-eslint/no-explicit-any */
 // src/app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { podcastIndexSearch } from '@/lib/podcastIndexClient';
