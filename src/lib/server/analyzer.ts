@@ -4,7 +4,7 @@ import path from "node:path";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { detectAds } from "@/lib/ads/heuristic";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
-import type { AdRange, AnalyzeResponse, DetectorKind, TranscriptSegment } from "@/lib/types";
+import type { AdRange, AnalyzeResponse, CachedAnalysis, DetectorKind, TranscriptSegment } from "@/lib/types";
 import { extractWindow } from "@/lib/server/audio";
 import { classifyWindow, claudeEnabled } from "@/lib/server/claudeDetector";
 import { whisper } from "@/lib/server/whisper";
@@ -35,33 +35,38 @@ function keyFor(url: string) {
 // --- Cache ---------------------------------------------------------------------
 
 const state = globalThis as unknown as {
-  __podblockEpisodes?: Map<string, EpisodeRecord>;
+  __podblockEpisodes?: Map<string, Promise<EpisodeRecord>>;
   __podblockInflight?: Map<string, SharedTask<TranscriptSegment[]>>;
 };
-const episodes = (state.__podblockEpisodes ??= new Map<string, EpisodeRecord>());
+/**
+ * Keyed by URL hash. Holds the load *promise* so concurrent first requests for
+ * an episode share one record instead of each building (and saving) their own.
+ */
+const episodes = (state.__podblockEpisodes ??= new Map<string, Promise<EpisodeRecord>>());
 const inflight = (state.__podblockInflight ??= new Map<string, SharedTask<TranscriptSegment[]>>());
 
-async function loadEpisode(url: string): Promise<EpisodeRecord> {
+function loadEpisode(url: string): Promise<EpisodeRecord> {
   const key = keyFor(url);
-  const cached = episodes.get(key);
-  if (cached) {
+  let record = episodes.get(key);
+  if (record) {
     // Refresh LRU position.
     episodes.delete(key);
-    episodes.set(key, cached);
-    return cached;
+  } else {
+    record = readEpisode(url, key);
   }
-
-  let record: EpisodeRecord = { version: CACHE_VERSION, url, windows: {}, claude: {} };
-  try {
-    const stored = JSON.parse(await fs.readFile(path.join(CACHE_DIR, `${key}.json`), "utf-8"));
-    if (stored.version === CACHE_VERSION && stored.url === url) record = stored;
-  } catch {
-    // Not cached yet.
-  }
-
   episodes.set(key, record);
   if (episodes.size > MEMORY_LIMIT) episodes.delete(episodes.keys().next().value!);
   return record;
+}
+
+async function readEpisode(url: string, key: string): Promise<EpisodeRecord> {
+  try {
+    const stored = JSON.parse(await fs.readFile(path.join(CACHE_DIR, `${key}.json`), "utf-8"));
+    if (stored.version === CACHE_VERSION && stored.url === url) return stored;
+  } catch {
+    // Not cached yet.
+  }
+  return { version: CACHE_VERSION, url, windows: {}, claude: {} };
 }
 
 const pendingWrites = new Map<string, NodeJS.Timeout>();
@@ -229,5 +234,16 @@ export async function analyzeWindow(
     ads: computeAds(record),
     detector: detectorKind(),
     cached,
+  };
+}
+
+/** Everything already analyzed for an episode, without doing any new work. */
+export async function cachedAnalysis(url: string): Promise<CachedAnalysis> {
+  const record = await loadEpisode(url);
+  return {
+    windows: Object.keys(record.windows).map(Number).sort((a, b) => a - b),
+    segments: allSegments(record),
+    ads: computeAds(record),
+    detector: detectorKind(),
   };
 }

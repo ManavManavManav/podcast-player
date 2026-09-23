@@ -117,6 +117,9 @@ class WhisperWorker {
       env: { ...process.env, WHISPER_MODEL: whisperModel },
     });
     this.proc = proc;
+    // Writing to the pipe of a worker that just died raises EPIPE here; left
+    // unhandled it would crash the server. The "exit" handler recovers.
+    proc.stdin.on("error", () => {});
 
     const lines = readline.createInterface({ input: proc.stdout });
     let stderrTail = "";
@@ -148,6 +151,13 @@ class WhisperWorker {
         } else {
           this.onResult(message);
         }
+      });
+
+      // A failed spawn emits "error" and may never emit "exit".
+      proc.on("error", (err) => {
+        clearTimeout(timer);
+        if (!started) reject(err);
+        else proc.kill();
       });
 
       proc.on("exit", (code) => {

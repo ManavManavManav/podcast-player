@@ -20,6 +20,8 @@ interface PlaybackState {
   source: string | null;
   playing: boolean;
   buffering: boolean;
+  /** Paused at the end of an ad break while checking whether it continues. */
+  holding: boolean;
   currentTime: number;
   duration: number;
   error: string | null;
@@ -30,6 +32,7 @@ export const usePlayback = create<PlaybackState>()(() => ({
   source: null,
   playing: false,
   buffering: false,
+  holding: false,
   currentTime: 0,
   duration: 0,
   error: null,
@@ -71,10 +74,13 @@ interface PlayerState {
   setAutoSkip: (on: boolean) => void;
   setPanelOpen: (open: boolean) => void;
   setSleep: (minutes: number | null) => void;
-  recordSkip: (seconds: number) => void;
+  /** Adds to the lifetime stats; `newAd` is false when extending a skip already counted. */
+  recordSkip: (seconds: number, newAd: boolean) => void;
   savePosition: () => void;
   resumePoint: (episode: Episode) => number;
 }
+
+const noStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 const RECENT_LIMIT = 12;
 const POSITION_LIMIT = 300;
@@ -150,10 +156,10 @@ export const usePlayer = create<PlayerState>()(
 
       setSleep: (minutes) => set({ sleepAt: minutes === null ? null : Date.now() + minutes * 60_000 }),
 
-      recordSkip: (seconds) =>
+      recordSkip: (seconds, newAd) =>
         set((s) => ({
           stats: {
-            adsSkipped: s.stats.adsSkipped + 1,
+            adsSkipped: s.stats.adsSkipped + (newAd ? 1 : 0),
             secondsSaved: s.stats.secondsSaved + seconds,
           },
         })),
@@ -180,7 +186,9 @@ export const usePlayer = create<PlayerState>()(
     {
       name: "podblock-player",
       version: 1,
-      storage: createJSONStorage(() => localStorage),
+      // `window.localStorage`, not the global: Node 25+ has an experimental
+      // global localStorage that warns when touched during server rendering.
+      storage: createJSONStorage(() => (typeof window === "undefined" ? noStorage : window.localStorage)),
       // Rehydrated by <Player> after mount, so the first client render matches
       // the server's (which has no localStorage).
       skipHydration: true,

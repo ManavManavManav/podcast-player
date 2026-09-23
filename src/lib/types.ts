@@ -59,6 +59,14 @@ export interface AnalyzeResponse {
   cached: boolean;
 }
 
+/** Response of GET /api/analyze: everything already analyzed for an episode. */
+export interface CachedAnalysis {
+  windows: number[];
+  segments: TranscriptSegment[];
+  ads: AdRange[];
+  detector: DetectorKind;
+}
+
 export interface HealthResponse {
   ok: boolean;
   podcastIndex: boolean;

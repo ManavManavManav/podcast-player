@@ -20,7 +20,7 @@ export function SearchBox({ size = "md", autoFocus = false }: { size?: "md" | "l
   useEffect(() => {
     if (size !== "md") return;
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target instanceof Element ? e.target : document.body;
       if (e.key !== "/" || target.closest("input, textarea, [contenteditable]")) return;
       e.preventDefault();
       input.current?.focus();

@@ -76,7 +76,7 @@ const SIGNALS: Signal[] = [
   {
     kind: "break",
     weight: 5,
-    label: "break",
+    label: "break announcement",
     pattern:
       /\b(?:(?:when|after) we (?:come|get) back|(?:right )?after (?:the|this|a) (?:short |quick )?break|(?:take|taking) (?:a|our) (?:short |quick |little )?break|we'll be right back|stay with us|back (?:right )?after (?:this|these)(?: messages?)?|a (?:quick|short) break)\b/g,
   },
@@ -91,13 +91,13 @@ const SIGNALS: Signal[] = [
   {
     kind: "pitch",
     weight: 4,
-    label: "URL with a path",
+    label: "promo link",
     pattern: new RegExp(String.raw`\b[a-z0-9-]{2,}\s?(?:\.|dot)\s?${TLD}\s?(?:/|slash)\s?[a-z0-9]`, "g"),
   },
   {
     kind: "pitch",
     weight: 5,
-    label: "repeated URL",
+    label: "repeated web address",
     // "That's example.com" / "Again, that's example.com slash show": ads
     // spell their URL twice; conversation almost never does.
     pattern: new RegExp(String.raw`\b(?:that's|again,? that's|once again,?|again, it's|again, go to) [a-z0-9-]{2,}\s?(?:\.|dot)\s?${TLD}\b`, "g"),
@@ -105,13 +105,13 @@ const SIGNALS: Signal[] = [
   {
     kind: "pitch",
     weight: 2,
-    label: "URL",
+    label: "web address",
     pattern: new RegExp(String.raw`\b[a-z0-9-]{2,}\s?(?:\.|\bdot\b)\s?${TLD}\b`, "g"),
   },
   {
     kind: "pitch",
     weight: 4,
-    label: "disclaimer",
+    label: "legal disclaimer",
     pattern:
       /\b(?:terms|restrictions|exclusions|conditions|fees)(?: and (?:conditions|limitations|restrictions))? (?:may )?apply\b|\bsee (?:site|store|[a-z0-9-]+ ?(?:\.|dot) ?com)? ?for (?:full )?details\b|\bvary by state\b|\bnot available in (?:all|every) (?:states?|areas?)\b|\bmember fdic\b|\bnot a bank\b|\bno purchase necessary\b|\bvoid where prohibited\b|\bmust be (?:18|21)\b|\bgambling problem\b|\bsubject to (?:credit approval|approval|terms)\b|\bterms and qualifications\b|\binsurance (?:sold|offered|underwritten) by\b|\binsurance company and affiliates\b|\bads? (?:are|is) selected\b|\bpast performance\b|\bnot (?:financial|investment) advice\b/g,
   },
@@ -126,7 +126,7 @@ const SIGNALS: Signal[] = [
   {
     kind: "pitch",
     weight: 3,
-    label: "offer",
+    label: "special offer",
     pattern: new RegExp(
       String.raw`\b${NUM} ?(?:%|percent) off\b|\b(?:free|risk[- ]free|no[- ]risk) (?:trial|shipping|gift|month|week)s?\b|\bfirst (?:month|order|box|year) (?:free|for)\b|\bmoney[- ]back guarantee\b|\blimited[- ]time (?:offer|only)\b|\b(?:exclusive|special) (?:offer|deal|discount)s?\b|\bcash ?back\b|\bsave (?:up to |an average of )?(?:\$|hundreds\b|${NUM} ?(?:%|dollars|percent))|\$\d[\d,]* (?:credit|off|gift card)\b`,
       "g",
@@ -152,9 +152,9 @@ const LEAD_GAP = 100;
 const MIN_SCORE = 7;
 const MIN_DURATION = 6;
 /** Pitch kinds about buying something, as opposed to just visiting a site. */
-const COMMERCIAL_LABELS = new Set(["offer", "disclaimer", "promo code", "ad copy"]);
+const COMMERCIAL_LABELS = new Set(["special offer", "legal disclaimer", "promo code", "ad copy"]);
 /** Pitch kinds that essentially never occur outside an ad. */
-const AD_ONLY_LABELS = new Set(["ad copy", "disclaimer", "promo code"]);
+const AD_ONLY_LABELS = new Set(["ad copy", "legal disclaimer", "promo code"]);
 /** How close (seconds) a weak snippet must be to a confirmed ad to join it. */
 const ADJACENT = 5;
 export interface Hit {

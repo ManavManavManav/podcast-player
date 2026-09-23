@@ -221,8 +221,8 @@ function AdList() {
                   <span className="rounded-full bg-ad-soft px-1.5 py-px text-ad-text">{formatDuration(ad.end - ad.start)}</span>
                   <span className="ml-auto text-faint">{status}</span>
                 </div>
-                <p className="mt-1 line-clamp-2 text-sm text-muted">{preview}</p>
-                {ad.reason && <p className="mt-1 text-[11px] text-faint">Why: {ad.reason}</p>}
+                {preview && <p className="mt-1 line-clamp-2 text-sm text-muted">{preview}</p>}
+                {ad.reason && <p className="mt-1 text-[11px] text-faint">Spotted by: {ad.reason}</p>}
               </button>
             </li>
           );

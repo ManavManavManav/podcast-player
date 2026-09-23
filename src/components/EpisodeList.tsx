@@ -54,7 +54,9 @@ function EpisodeRow({ episode }: { episode: Episode }) {
             {episode.title}
           </button>
         </h3>
-        {episode.description && <p className="mt-1 line-clamp-2 text-sm text-muted">{episode.description}</p>}
+        {episode.description && episode.description !== episode.title && (
+          <p className="mt-1 line-clamp-2 text-sm text-muted">{episode.description}</p>
+        )}
       </div>
     </li>
   );

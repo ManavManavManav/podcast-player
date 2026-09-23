@@ -35,6 +35,15 @@ export function useAdScanner(enabled: boolean) {
     const timers = retryTimers.current;
     useAnalysis.getState().reset(url);
     failures.current = 0;
+    if (url) {
+      // Show whatever was analyzed on a previous listen right away.
+      void fetch(`/api/analyze?url=${encodeURIComponent(url)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((cached) => {
+          if (cached && useAnalysis.getState().url === url) useAnalysis.getState().restore(cached);
+        })
+        .catch(() => {});
+    }
     return () => {
       for (const controller of inflight.values()) controller.abort();
       inflight.clear();
@@ -42,6 +51,11 @@ export function useAdScanner(enabled: boolean) {
       timers.clear();
     };
   }, [url]);
+
+  // Retrying after the scanner gave up starts the failure count over.
+  useEffect(() => {
+    if (!error) failures.current = 0;
+  }, [error]);
 
   useEffect(() => {
     if (!enabled || !url || error) return;
@@ -83,9 +97,15 @@ export function useAdScanner(enabled: boolean) {
         signal: controller.signal,
       })
         .then(async (res) => {
-          const body = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(body.error || `Analysis failed (${res.status})`);
-          return body as AnalyzeResponse;
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error || `Analysis failed (${res.status})`);
+          }
+          const body = (await res.json()) as AnalyzeResponse;
+          if (!Array.isArray(body.segments) || !Array.isArray(body.ads)) {
+            throw new Error("The server sent an unexpected response");
+          }
+          return body;
         })
         .then((result) => {
           release();

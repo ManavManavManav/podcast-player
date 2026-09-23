@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { WINDOW_SECONDS } from "@/lib/analysis";
-import type { AdRange, DetectorKind, TranscriptSegment } from "@/lib/types";
+import type { AdRange, CachedAnalysis, DetectorKind, TranscriptSegment } from "@/lib/types";
 
 export type WindowStatus = "pending" | "done" | "error";
 
@@ -22,6 +22,8 @@ interface AnalysisState {
   clearStatus: (window: number) => void;
   addWindow: (window: number, segments: TranscriptSegment[], ads: AdRange[], detector: DetectorKind) => void;
   setError: (error: string | null) => void;
+  /** Merges previously analyzed windows fetched from the server cache. */
+  restore: (cached: CachedAnalysis) => void;
 }
 
 export const useAnalysis = create<AnalysisState>()((set) => ({
@@ -55,6 +57,22 @@ export const useAnalysis = create<AnalysisState>()((set) => ({
     })),
 
   setError: (error) => set({ error }),
+
+  restore: (cached) =>
+    set((s) => {
+      const windows = { ...s.windows };
+      for (const w of cached.windows) windows[w] = "done";
+      const known = new Set(s.segments.map((seg) => seg.start));
+      return {
+        windows,
+        segments: [...s.segments, ...cached.segments.filter((seg) => !known.has(seg.start))].sort(
+          (a, b) => a.start - b.start,
+        ),
+        // Newer results from in-flight windows win over the snapshot.
+        ads: s.ads.length ? s.ads : cached.ads,
+        detector: s.detector ?? cached.detector,
+      };
+    }),
 }));
 
 /** The ad range containing `time`, if any. */

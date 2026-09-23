@@ -23,6 +23,7 @@ import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Timeline } from "@/components/player/Timeline";
 import { useAdScanner } from "@/hooks/useAdScanner";
+import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { formatClock } from "@/lib/text";
 import type { AdRange } from "@/lib/types";
 import { adAt, useAnalysis } from "@/store/analysis";
@@ -33,8 +34,23 @@ const FORWARD_SECONDS = 30;
 const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
 /** Don't bother skipping the last sliver of an ad. */
 const MIN_REMAINING = 1.5;
+/** Longest we'll wait at the end of an ad break to learn whether it continues. */
+const MAX_HOLD_MS = 15_000;
 
-const adKey = (ad: AdRange) => Math.round(ad.start);
+/**
+ * Ad ranges get recomputed (and can grow) as more of the episode is
+ * transcribed, so ads the listener chose to hear, or already skipped, are
+ * remembered as intervals and matched by overlap.
+ */
+const overlaps = (a: AdRange, list: AdRange[]) => list.some((b) => a.start < b.end && b.start < a.end);
+
+/** End of the run of analyzed windows that contains `time`. */
+function analyzedUntil(time: number): number {
+  const { windows } = useAnalysis.getState();
+  let w = windowStartFor(time);
+  while (windows[w] === "done") w += WINDOW_SECONDS;
+  return w;
+}
 
 export function Player() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -45,8 +61,20 @@ export function Player() {
 
   // Auto-skip bookkeeping, kept in refs because it changes on every tick.
   const lastTime = useRef(0);
-  const ignored = useRef(new Set<number>());
+  const ignored = useRef<AdRange[]>([]);
+  const skipped = useRef<AdRange[]>([]);
   const programmaticSeek = useRef(false);
+  const hold = useRef<{ frontier: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const holding = usePlayback((s) => s.holding);
+
+  const releaseHold = useCallback((resume: boolean) => {
+    const current = hold.current;
+    if (!current) return;
+    clearTimeout(current.timer);
+    hold.current = null;
+    usePlayback.setState({ holding: false });
+    if (resume) void audioRef.current?.play().catch(() => {});
+  }, []);
 
   // Restore settings and the last episode from localStorage after mount.
   useEffect(() => {
@@ -64,12 +92,17 @@ export function Player() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    ignored.current.clear();
+    ignored.current = [];
+    skipped.current = [];
+    releaseHold(false);
     setNotice(null);
+    // Stop the previous episode now; resolving the new one can take a moment,
+    // and its time updates would otherwise be saved as the new one's position.
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
     if (!episode) {
       usePlayback.setState({ source: null });
-      audio.removeAttribute("src");
-      audio.load();
       return;
     }
 
@@ -117,7 +150,7 @@ export function Player() {
       cancelled = true;
       audio.removeEventListener("loadedmetadata", onReady);
     };
-  }, [episode]);
+  }, [episode, releaseHold]);
 
   // --- Settings → element -------------------------------------------------------------
   const volume = usePlayer((s) => s.volume);
@@ -142,15 +175,43 @@ export function Player() {
     if (!natural || audio.paused || !usePlayer.getState().autoSkip) return;
 
     const ad = adAt(useAnalysis.getState().ads, t);
-    if (!ad || ignored.current.has(adKey(ad)) || ad.end - t < MIN_REMAINING) return;
+    if (!ad || overlaps(ad, ignored.current) || ad.end - t < MIN_REMAINING) return;
 
+    // A long ad break grows as more of it is transcribed, so it can take a few
+    // hops; they count as one skip.
+    const firstHop = !overlaps(ad, skipped.current);
+    skipped.current.push(ad);
     programmaticSeek.current = true;
     audio.currentTime = ad.end;
     lastTime.current = ad.end;
     usePlayback.setState({ currentTime: ad.end });
-    usePlayer.getState().recordSkip(ad.end - t);
-    setNotice({ ad, from: t, at: Date.now() });
+    usePlayer.getState().recordSkip(ad.end - t, firstHop);
+    setNotice((previous) => ({
+      ad,
+      seconds: (firstHop || !previous ? 0 : previous.seconds) + (ad.end - t),
+      at: Date.now(),
+    }));
+
+    // If the ad runs right up to the end of what's been transcribed, it may
+    // well continue. Wait for the next minute rather than play a fragment.
+    const frontier = analyzedUntil(ad.start);
+    const { duration } = usePlayback.getState();
+    if (ad.end >= frontier - 1.5 && (!duration || frontier < duration)) {
+      releaseHold(false);
+      hold.current = { frontier, timer: setTimeout(() => releaseHold(true), MAX_HOLD_MS) };
+      usePlayback.setState({ holding: true });
+      audio.pause();
+    }
   };
+
+  // Resume from a hold once the next window is in (or failed).
+  const windows = useAnalysis((s) => s.windows);
+  useEffect(() => {
+    const current = hold.current;
+    if (!current) return;
+    const status = windows[current.frontier];
+    if (status === "done" || status === "error") releaseHold(true);
+  }, [windows, releaseHold]);
 
   const onSeeking = () => {
     const audio = audioRef.current!;
@@ -158,18 +219,21 @@ export function Player() {
       programmaticSeek.current = false;
       return;
     }
+    // The listener took over; stop waiting on the ad break.
+    releaseHold(true);
     // The listener deliberately jumped into an ad (e.g. clicked it in the list):
     // let it play. Seeking within an ad they're already in keeps skipping on.
     const ads = useAnalysis.getState().ads;
     const target = adAt(ads, audio.currentTime);
-    if (target && adAt(ads, lastTime.current) !== target) ignored.current.add(adKey(target));
+    if (target && adAt(ads, lastTime.current) !== target) ignored.current.push(target);
     lastTime.current = audio.currentTime;
     usePlayback.setState({ currentTime: audio.currentTime });
   };
 
   const undoSkip = () => {
     if (!notice) return;
-    ignored.current.add(adKey(notice.ad));
+    releaseHold(false);
+    ignored.current.push(notice.ad);
     programmaticSeek.current = true;
     usePlayer.getState().seek(notice.ad.start);
     lastTime.current = notice.ad.start;
@@ -210,7 +274,10 @@ export function Player() {
         preload="metadata"
         onTimeUpdate={onTimeUpdate}
         onSeeking={onSeeking}
-        onPlay={() => usePlayback.setState({ playing: true, error: null })}
+        onPlay={() => {
+          releaseHold(false);
+          usePlayback.setState({ playing: true, error: null });
+        }}
         onPause={() => {
           usePlayback.setState({ playing: false });
           usePlayer.getState().savePosition();
@@ -238,7 +305,7 @@ export function Player() {
       {episode && (
         <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-2 pb-2 sm:px-4 sm:pb-4">
           <div className="pointer-events-auto">
-            {notice && <SkipToast notice={notice} onUndo={undoSkip} onDismiss={dismissNotice} />}
+            {notice && <SkipToast notice={notice} holding={holding} onUndo={undoSkip} onDismiss={dismissNotice} />}
             {panelOpen && <NowPlayingPanel />}
             <PlayerBar />
           </div>
@@ -252,7 +319,7 @@ export function Player() {
 
 function PlayerBar() {
   const episode = usePlayer((s) => s.episode)!;
-  const { playing, buffering, currentTime, duration, error } = usePlayback();
+  const { playing, buffering, holding, currentTime, duration, error } = usePlayback();
   const { toggle, skipBy, seek, stop } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
@@ -261,7 +328,7 @@ function PlayerBar() {
     <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-surface/95 px-3 pb-2 pt-3 shadow-card backdrop-blur-xl sm:px-4">
       <div className="flex items-center gap-3">
         <Link href={`/podcast/${episode.podcastId}`} className="shrink-0" aria-label={`Go to ${episode.podcastTitle}`}>
-          <Artwork src={episode.image} alt="" className="size-11 rounded-lg" />
+          <Artwork src={episode.image} alt="" priority className="size-11 rounded-lg" />
         </Link>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-tight">{episode.title}</p>
@@ -280,7 +347,7 @@ function PlayerBar() {
             aria-label={playing ? "Pause" : "Play"}
             className="grid size-11 place-items-center rounded-full bg-accent text-accent-text shadow-card transition hover:brightness-110 active:scale-95"
           >
-            {buffering && playing ? (
+            {(buffering && playing) || holding ? (
               <LoaderCircle className="size-5 animate-spin" />
             ) : playing ? (
               <Pause className="size-5 fill-current" />
@@ -510,7 +577,7 @@ function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
-      const target = e.target as HTMLElement;
+      const target = e.target instanceof Element ? e.target : document.body;
       if (target.closest("input, textarea, select, [contenteditable], [role=slider]")) return;
       const player = usePlayer.getState();
       if (!player.episode) return;
