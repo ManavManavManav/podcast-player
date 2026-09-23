@@ -19,6 +19,27 @@ export function supportsJsonMode(model: string) {
   return !VISION_MODELS.some((pattern) => pattern.test(model));
 }
 
+/**
+ * Models that always reason before answering and reject `thinking: disabled`
+ * (Z.ai: GLM-5.3 models accept only low/high/max effort). Others are added
+ * at runtime if Z.ai says so, so a newer model doesn't break detection.
+ */
+const ALWAYS_THINKS = [/^glm-5\.3/];
+const learnedThinkers = new Set<string>();
+
+function alwaysThinks(model: string) {
+  return learnedThinkers.has(model) || ALWAYS_THINKS.some((pattern) => pattern.test(model));
+}
+
+class ZaiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(`Z.ai ${status}: ${message}`);
+  }
+}
+
 interface ChatResponse {
   choices?: Array<{ message?: { content?: string } }>;
   error?: { message?: string };
@@ -33,28 +54,45 @@ export async function classifyWithGlm(
 ): Promise<AdRange[]> {
   if (window.length === 0) return [];
 
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: `${SYSTEM_PROMPT}\n\n${JSON_INSTRUCTIONS}` },
-        { role: "user", content: formatTranscript(window, context) },
-      ],
-      // A yes/no classification: no reasoning, low randomness.
-      thinking: { type: "disabled" },
-      temperature: 0.2,
-      max_tokens: 1024,
-      ...(supportsJsonMode(model) ? { response_format: { type: "json_object" } } : {}),
-    }),
-    signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(60_000)]) : AbortSignal.timeout(60_000),
-  });
+  const request = (thinking: boolean) =>
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: `${SYSTEM_PROMPT}\n\n${JSON_INSTRUCTIONS}` },
+          { role: "user", content: formatTranscript(window, context) },
+        ],
+        // A simple classification: no reasoning where the model allows it,
+        // the least it will do otherwise.
+        ...(thinking
+          ? { thinking: { type: "enabled" }, reasoning_effort: "low" }
+          : { thinking: { type: "disabled" } }),
+        temperature: 0.2,
+        // Reasoning counts toward output tokens; leave room for the answer.
+        max_tokens: thinking ? 4096 : 1024,
+        ...(supportsJsonMode(model) ? { response_format: { type: "json_object" } } : {}),
+      }),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(90_000)]) : AbortSignal.timeout(90_000),
+    }).then(async (res) => {
+      const body = (await res.json().catch(() => ({}))) as ChatResponse;
+      if (!res.ok) throw new ZaiError(res.status, body.error?.message ?? res.statusText);
+      return body;
+    });
 
-  const body = (await res.json().catch(() => ({}))) as ChatResponse;
-  if (!res.ok) {
-    throw new Error(`Z.ai ${res.status}: ${body.error?.message ?? res.statusText}`);
+  let body: ChatResponse;
+  try {
+    body = await request(alwaysThinks(model));
+  } catch (err) {
+    // "This model always engages in thinking and cannot be disabled"
+    const cannotDisable =
+      err instanceof ZaiError && err.status === 400 && /thinking/i.test(err.message) && !alwaysThinks(model);
+    if (!cannotDisable) throw err;
+    learnedThinkers.add(model);
+    body = await request(true);
   }
+
   const text = body.choices?.[0]?.message?.content;
   if (!text) throw new Error("Z.ai returned an empty answer");
   return parseAds(text, window);

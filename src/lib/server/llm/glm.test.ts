@@ -41,6 +41,39 @@ describe("classifyWithGlm", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).response_format).toBeUndefined();
   });
 
+  it("uses low-effort thinking for GLM-5.3 models, which can't disable it", async () => {
+    const fetchMock = mockFetch(200, { choices: [{ message: { content: '{"ads": []}' } }] });
+    await classifyWithGlm(window, [], { apiKey: "zai-key-123456", model: "glm-5.3-flash" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.thinking).toEqual({ type: "enabled" });
+    expect(body.reasoning_effort).toBe("low");
+    expect(body.max_tokens).toBe(4096);
+  });
+
+  it("retries with thinking on when an unknown model refuses to disable it, and remembers", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: { message: "This model always engages in thinking and cannot be disabled; please use low, high, or max" },
+          }),
+          { status: 400 },
+        ),
+      )
+      .mockImplementation(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"ads": []}' } }] })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const config = { apiKey: "zai-key-123456", model: "glm-9-future" };
+    expect(await classifyWithGlm(window, [], config)).toEqual([]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).thinking).toEqual({ type: "disabled" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).thinking).toEqual({ type: "enabled" });
+
+    await classifyWithGlm(window, [], config);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // no failed attempt the second time
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body).reasoning_effort).toBe("low");
+  });
+
   it("surfaces API errors", async () => {
     mockFetch(401, { error: { message: "Invalid API key" } });
     await expect(classifyWithGlm(window, [], { apiKey: "bad-key-000000", model: "glm-4.7-flash" })).rejects.toThrow(
