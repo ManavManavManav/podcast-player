@@ -1,0 +1,551 @@
+"use client";
+
+import {
+  LoaderCircle,
+  Moon,
+  Pause,
+  Play,
+  RotateCcw,
+  RotateCw,
+  ScrollText,
+  ShieldCheck,
+  ShieldOff,
+  Volume1,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Artwork } from "@/components/Artwork";
+import { MenuItem, Popover } from "@/components/player/Popover";
+import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
+import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
+import { Timeline } from "@/components/player/Timeline";
+import { useAdScanner } from "@/hooks/useAdScanner";
+import { formatClock } from "@/lib/text";
+import type { AdRange } from "@/lib/types";
+import { adAt, useAnalysis } from "@/store/analysis";
+import { PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
+
+const BACK_SECONDS = 15;
+const FORWARD_SECONDS = 30;
+const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
+/** Don't bother skipping the last sliver of an ad. */
+const MIN_REMAINING = 1.5;
+
+const adKey = (ad: AdRange) => Math.round(ad.start);
+
+export function Player() {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const episode = usePlayer((s) => s.episode);
+  const panelOpen = usePlayer((s) => s.panelOpen);
+  const [notice, setNotice] = useState<SkipNotice | null>(null);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+
+  // Auto-skip bookkeeping, kept in refs because it changes on every tick.
+  const lastTime = useRef(0);
+  const ignored = useRef(new Set<number>());
+  const programmaticSeek = useRef(false);
+
+  // Restore settings and the last episode from localStorage after mount.
+  useEffect(() => {
+    void usePlayer.persist.rehydrate();
+  }, []);
+
+  useEffect(() => {
+    usePlayback.setState({ audio: audioRef.current });
+    return () => usePlayback.setState({ audio: null });
+  }, []);
+
+  useAdScanner(Boolean(episode));
+
+  // --- Load a new episode ---------------------------------------------------------
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    ignored.current.clear();
+    setNotice(null);
+    if (!episode) {
+      usePlayback.setState({ source: null });
+      audio.removeAttribute("src");
+      audio.load();
+      return;
+    }
+
+    const player = usePlayer.getState();
+    const resumeAt = player.resumePoint(episode);
+    usePlayback.setState({
+      source: null,
+      currentTime: resumeAt,
+      duration: episode.duration,
+      playing: false,
+      buffering: player.autoplay,
+      error: null,
+    });
+    lastTime.current = resumeAt;
+
+    let cancelled = false;
+    const onReady = () => {
+      if (resumeAt) {
+        programmaticSeek.current = true;
+        audio.currentTime = resumeAt;
+      }
+      if (usePlayer.getState().autoplay) {
+        void audio.play().catch(() => usePlayback.setState({ buffering: false }));
+        usePlayer.setState({ autoplay: false });
+      }
+    };
+
+    // Pin the ad-stitched variant first so playback and analysis agree.
+    void fetch("/api/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: episode.audioUrl }),
+    })
+      .then((res) => (res.ok ? res.json() : { url: episode.audioUrl }))
+      .catch(() => ({ url: episode.audioUrl }))
+      .then(({ url }: { url: string }) => {
+        if (cancelled) return;
+        usePlayback.setState({ source: url });
+        audio.addEventListener("loadedmetadata", onReady, { once: true });
+        audio.src = url;
+        audio.playbackRate = usePlayer.getState().rate;
+      });
+
+    return () => {
+      cancelled = true;
+      audio.removeEventListener("loadedmetadata", onReady);
+    };
+  }, [episode]);
+
+  // --- Settings → element -------------------------------------------------------------
+  const volume = usePlayer((s) => s.volume);
+  const muted = usePlayer((s) => s.muted);
+  const rate = usePlayer((s) => s.rate);
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume;
+    audio.muted = muted;
+    audio.playbackRate = rate;
+  }, [volume, muted, rate]);
+
+  // --- Auto-skip ------------------------------------------------------------------------
+  const onTimeUpdate = () => {
+    const audio = audioRef.current!;
+    const t = audio.currentTime;
+    usePlayback.setState({ currentTime: t });
+
+    const natural = Math.abs(t - lastTime.current) < 3;
+    lastTime.current = t;
+    if (!natural || audio.paused || !usePlayer.getState().autoSkip) return;
+
+    const ad = adAt(useAnalysis.getState().ads, t);
+    if (!ad || ignored.current.has(adKey(ad)) || ad.end - t < MIN_REMAINING) return;
+
+    programmaticSeek.current = true;
+    audio.currentTime = ad.end;
+    lastTime.current = ad.end;
+    usePlayback.setState({ currentTime: ad.end });
+    usePlayer.getState().recordSkip(ad.end - t);
+    setNotice({ ad, from: t, at: Date.now() });
+  };
+
+  const onSeeking = () => {
+    const audio = audioRef.current!;
+    if (programmaticSeek.current) {
+      programmaticSeek.current = false;
+      return;
+    }
+    // The listener deliberately jumped into an ad (e.g. clicked it in the list):
+    // let it play. Seeking within an ad they're already in keeps skipping on.
+    const ads = useAnalysis.getState().ads;
+    const target = adAt(ads, audio.currentTime);
+    if (target && adAt(ads, lastTime.current) !== target) ignored.current.add(adKey(target));
+    lastTime.current = audio.currentTime;
+    usePlayback.setState({ currentTime: audio.currentTime });
+  };
+
+  const undoSkip = () => {
+    if (!notice) return;
+    ignored.current.add(adKey(notice.ad));
+    programmaticSeek.current = true;
+    usePlayer.getState().seek(notice.ad.start);
+    lastTime.current = notice.ad.start;
+    setNotice(null);
+  };
+
+  // --- Save progress --------------------------------------------------------------------
+  useEffect(() => {
+    const save = () => usePlayer.getState().savePosition();
+    const interval = setInterval(() => {
+      if (usePlayback.getState().playing) save();
+    }, 5000);
+    window.addEventListener("pagehide", save);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("pagehide", save);
+    };
+  }, []);
+
+  // --- Sleep timer ------------------------------------------------------------------------
+  const sleepAt = usePlayer((s) => s.sleepAt);
+  useEffect(() => {
+    if (sleepAt === null) return;
+    const timer = setTimeout(() => {
+      audioRef.current?.pause();
+      usePlayer.getState().setSleep(null);
+    }, Math.max(0, sleepAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [sleepAt]);
+
+  useMediaSession();
+  useKeyboardShortcuts();
+
+  return (
+    <>
+      <audio
+        ref={audioRef}
+        preload="metadata"
+        onTimeUpdate={onTimeUpdate}
+        onSeeking={onSeeking}
+        onPlay={() => usePlayback.setState({ playing: true, error: null })}
+        onPause={() => {
+          usePlayback.setState({ playing: false });
+          usePlayer.getState().savePosition();
+        }}
+        onWaiting={() => usePlayback.setState({ buffering: true })}
+        onPlaying={() => usePlayback.setState({ buffering: false })}
+        onCanPlay={() => usePlayback.setState({ buffering: false })}
+        onDurationChange={(e) => {
+          const d = e.currentTarget.duration;
+          if (Number.isFinite(d) && d > 0) usePlayback.setState({ duration: d });
+        }}
+        onEnded={() => {
+          usePlayback.setState({ playing: false });
+          usePlayer.getState().savePosition();
+        }}
+        onError={() => {
+          if (!audioRef.current?.getAttribute("src")) return;
+          usePlayback.setState({
+            playing: false,
+            buffering: false,
+            error: "This episode's audio couldn't be loaded.",
+          });
+        }}
+      />
+      {episode && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-2 pb-2 sm:px-4 sm:pb-4">
+          <div className="pointer-events-auto">
+            {notice && <SkipToast notice={notice} onUndo={undoSkip} onDismiss={dismissNotice} />}
+            {panelOpen && <NowPlayingPanel />}
+            <PlayerBar />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// --- Bar --------------------------------------------------------------------------------
+
+function PlayerBar() {
+  const episode = usePlayer((s) => s.episode)!;
+  const { playing, buffering, currentTime, duration, error } = usePlayback();
+  const { toggle, skipBy, seek, stop } = usePlayer();
+  const ads = useAnalysis((s) => s.ads);
+  const windows = useAnalysis((s) => s.windows);
+
+  return (
+    <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-surface/95 px-3 pb-2 pt-3 shadow-card backdrop-blur-xl sm:px-4">
+      <div className="flex items-center gap-3">
+        <Link href={`/podcast/${episode.podcastId}`} className="shrink-0" aria-label={`Go to ${episode.podcastTitle}`}>
+          <Artwork src={episode.image} alt="" className="size-11 rounded-lg" />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold leading-tight">{episode.title}</p>
+          <p className="truncate text-xs text-muted">
+            {error ? <span className="text-danger">{error}</span> : episode.podcastTitle}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-0.5 sm:gap-1.5">
+          <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="hidden sm:grid">
+            <RotateCcw className="size-[18px]" />
+            <span className="absolute text-[8px] font-bold">{BACK_SECONDS}</span>
+          </IconButton>
+          <button
+            onClick={toggle}
+            aria-label={playing ? "Pause" : "Play"}
+            className="grid size-11 place-items-center rounded-full bg-accent text-accent-text shadow-card transition hover:brightness-110 active:scale-95"
+          >
+            {buffering && playing ? (
+              <LoaderCircle className="size-5 animate-spin" />
+            ) : playing ? (
+              <Pause className="size-5 fill-current" />
+            ) : (
+              <Play className="ml-0.5 size-5 fill-current" />
+            )}
+          </button>
+          <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="hidden sm:grid">
+            <RotateCw className="size-[18px]" />
+            <span className="absolute text-[8px] font-bold">{FORWARD_SECONDS}</span>
+          </IconButton>
+        </div>
+
+        <div className="hidden flex-1 items-center justify-end gap-1 md:flex">
+          <SecondaryControls />
+        </div>
+        <IconButton label="Close player" onClick={stop}>
+          <X className="size-4" />
+        </IconButton>
+      </div>
+
+      <div className="mt-1.5">
+        <Timeline currentTime={currentTime} duration={duration} ads={ads} windows={windows} onSeek={seek} />
+      </div>
+
+      <div className="flex items-center justify-between md:hidden">
+        <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="sm:hidden">
+          <RotateCcw className="size-[18px]" />
+          <span className="absolute text-[8px] font-bold">{BACK_SECONDS}</span>
+        </IconButton>
+        <SecondaryControls />
+        <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="sm:hidden">
+          <RotateCw className="size-[18px]" />
+          <span className="absolute text-[8px] font-bold">{FORWARD_SECONDS}</span>
+        </IconButton>
+      </div>
+    </div>
+  );
+}
+
+function SecondaryControls() {
+  const { autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen, stats } = usePlayer();
+  const adCount = useAnalysis((s) => s.ads.length);
+
+  return (
+    <>
+      <button
+        onClick={() => setAutoSkip(!autoSkip)}
+        aria-pressed={autoSkip}
+        title={autoSkip ? `Skipping ads · ${stats.adsSkipped} skipped so far` : "Ad skipping is off"}
+        className={`flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition ${
+          autoSkip ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2"
+        }`}
+      >
+        {autoSkip ? <ShieldCheck className="size-4" /> : <ShieldOff className="size-4" />}
+        <span>{autoSkip ? "Skip ads" : "Ads on"}</span>
+        {adCount > 0 && <span className="rounded-full bg-ad-soft px-1.5 text-[10px] text-ad-text">{adCount}</span>}
+      </button>
+
+      <Popover label="Playback speed" trigger={<span className="tabular-nums">{rate}×</span>}>
+        {(close) =>
+          PLAYBACK_RATES.map((r) => (
+            <MenuItem
+              key={r}
+              selected={r === rate}
+              onSelect={() => {
+                setRate(r);
+                close();
+              }}
+            >
+              {r}×
+            </MenuItem>
+          ))
+        }
+      </Popover>
+
+      <Popover
+        label="Sleep timer"
+        trigger={
+          <>
+            <Moon className={`size-4 ${sleepAt ? "fill-current text-accent" : ""}`} />
+            {sleepAt && <SleepCountdown until={sleepAt} />}
+          </>
+        }
+      >
+        {(close) => (
+          <>
+            <p className="px-3 pb-1 pt-1.5 text-xs text-faint">Pause after</p>
+            {SLEEP_OPTIONS.map((m) => (
+              <MenuItem
+                key={m}
+                onSelect={() => {
+                  setSleep(m);
+                  close();
+                }}
+              >
+                {m} minutes
+              </MenuItem>
+            ))}
+            {sleepAt && (
+              <MenuItem
+                onSelect={() => {
+                  setSleep(null);
+                  close();
+                }}
+              >
+                Turn off
+              </MenuItem>
+            )}
+          </>
+        )}
+      </Popover>
+
+      <button
+        onClick={() => setPanelOpen(!panelOpen)}
+        aria-pressed={panelOpen}
+        aria-label="Transcript and ads"
+        title="Transcript (T)"
+        className={`grid size-8 place-items-center rounded-full transition hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
+      >
+        <ScrollText className="size-4" />
+      </button>
+
+      <VolumeControl />
+    </>
+  );
+}
+
+function SleepCountdown({ until }: { until: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="tabular-nums text-accent">{formatClock((until - now) / 1000)}</span>;
+}
+
+function VolumeControl() {
+  const { volume, muted, setVolume, toggleMute } = usePlayer();
+  const Icon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  return (
+    <div className="hidden items-center gap-1 lg:flex">
+      <IconButton label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
+        <Icon className="size-4" />
+      </IconButton>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={muted ? 0 : volume}
+        onChange={(e) => setVolume(Number(e.target.value))}
+        aria-label="Volume"
+        className="h-1 w-20 cursor-pointer accent-[var(--accent)]"
+      />
+    </div>
+  );
+}
+
+function IconButton({
+  label,
+  onClick,
+  children,
+  className = "grid",
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`relative size-9 place-items-center rounded-full text-text transition hover:bg-surface-2 active:scale-95 ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// --- System integration ---------------------------------------------------------------
+
+/** Lock-screen / headphone / media-key controls. */
+function useMediaSession() {
+  const episode = usePlayer((s) => s.episode);
+  const playing = usePlayback((s) => s.playing);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const session = navigator.mediaSession;
+    if (!episode) {
+      session.metadata = null;
+      return;
+    }
+    session.metadata = new MediaMetadata({
+      title: episode.title,
+      artist: episode.podcastTitle,
+      album: "Podblock",
+      artwork: episode.image ? [{ src: episode.image, sizes: "512x512" }] : [],
+    });
+    const { toggle, skipBy, seek } = usePlayer.getState();
+    const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+      ["play", toggle],
+      ["pause", toggle],
+      ["seekbackward", (d) => skipBy(-(d.seekOffset ?? BACK_SECONDS))],
+      ["seekforward", (d) => skipBy(d.seekOffset ?? FORWARD_SECONDS)],
+      ["seekto", (d) => d.seekTime !== undefined && seek(d.seekTime)],
+    ];
+    for (const [action, handler] of handlers) {
+      try {
+        session.setActionHandler(action, handler);
+      } catch {
+        // Unsupported action in this browser.
+      }
+    }
+  }, [episode]);
+
+  useEffect(() => {
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+  }, [playing]);
+}
+
+/** Space/K play-pause, J/← back, L/→ forward, M mute, T transcript, S ad skipping. */
+function useKeyboardShortcuts() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("input, textarea, select, [contenteditable], [role=slider]")) return;
+      const player = usePlayer.getState();
+      if (!player.episode) return;
+
+      switch (e.key) {
+        case " ":
+          if (target.closest("button, a")) return; // let Space activate the focused control
+          player.toggle();
+          break;
+        case "k":
+          player.toggle();
+          break;
+        case "j":
+        case "ArrowLeft":
+          player.skipBy(-BACK_SECONDS);
+          break;
+        case "l":
+        case "ArrowRight":
+          player.skipBy(FORWARD_SECONDS);
+          break;
+        case "m":
+          player.toggleMute();
+          break;
+        case "t":
+          player.setPanelOpen(!player.panelOpen);
+          break;
+        case "s":
+          player.setAutoSkip(!player.autoSkip);
+          break;
+        default:
+          return;
+      }
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
