@@ -3,23 +3,30 @@ import { WINDOW_SECONDS, whisperLanguage } from "@/lib/analysis";
 import { analyzeWindow, cachedAnalysis } from "@/lib/server/analyzer";
 import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
+import { requireUser } from "@/lib/server/session";
+import { detectorFor } from "@/lib/server/settings";
 
 /** 12 hours: longer than any real episode, short enough to reject junk. */
 const MAX_START = 12 * 3600;
 
 /** What's already known about an episode, so a returning listener sees it at once. */
 export async function GET(req: NextRequest) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
+
   const url = req.nextUrl.searchParams.get("url");
   if (!isHttpUrl(url)) {
     return NextResponse.json({ error: "`url` must be an http(s) URL" }, { status: 400 });
   }
-  return NextResponse.json(await cachedAnalysis(url));
+  return NextResponse.json(await cachedAnalysis(url, detectorFor(user.id)));
 }
 
 /** Analyzes one window of an episode (or returns it from the cache). */
 export async function POST(req: NextRequest) {
   const refused = rejectCrossSite(req);
   if (refused) return refused;
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   let body: { url?: unknown; window?: unknown; language?: unknown };
   try {
@@ -53,6 +60,7 @@ export async function POST(req: NextRequest) {
       url,
       window,
       whisperLanguage(typeof language === "string" ? language : undefined),
+      detectorFor(user.id),
       req.signal,
     );
     return NextResponse.json(result);

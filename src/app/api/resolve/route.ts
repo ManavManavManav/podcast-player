@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isHttpUrl, resolveAudioUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
+import { requireUser } from "@/lib/server/session";
 
 /** Pins the stitched variant of an episode that both playback and analysis use. */
 export async function POST(req: NextRequest) {
   const refused = rejectCrossSite(req);
   if (refused) return refused;
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
 
   const body = await req.json().catch(() => ({}));
   if (!isHttpUrl(body.url) || !(await isPublicUrl(body.url))) {

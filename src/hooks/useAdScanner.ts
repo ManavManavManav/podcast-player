@@ -111,7 +111,7 @@ export function useAdScanner(enabled: boolean) {
           release();
           if (useAnalysis.getState().url !== url) return;
           failures.current = 0;
-          useAnalysis.getState().addWindow(w, result.segments, result.ads, result.detector);
+          useAnalysis.getState().addWindow(w, result.segments, result.ads, result.detector, result.detectorError);
         })
         .catch((err: Error) => {
           release();

@@ -1,6 +1,7 @@
 "use client";
 
 import { LoaderCircle, RefreshCw, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { retryScanning } from "@/hooks/useAdScanner";
 import { formatClock, formatDuration } from "@/lib/text";
@@ -62,6 +63,7 @@ function ScanStatus() {
   const windows = useAnalysis((s) => s.windows);
   const error = useAnalysis((s) => s.error);
   const detector = useAnalysis((s) => s.detector);
+  const detectorError = useAnalysis((s) => s.detectorError);
   const scanning = Object.values(windows).includes("pending");
   const done = Object.values(windows).filter((s) => s === "done").length;
 
@@ -78,11 +80,28 @@ function ScanStatus() {
     );
   }
 
+  if (detectorError && detector && detector !== "heuristic") {
+    return (
+      <p className="ml-auto flex min-w-0 items-center gap-1.5 text-xs text-ad-text" title={detectorError}>
+        <span className="truncate">
+          {detector === "glm" ? "GLM" : "Claude"} isn&apos;t working ({detectorError}); using on-device detection.
+        </span>
+        <Link href="/settings" className="shrink-0 font-medium underline">
+          Fix
+        </Link>
+      </p>
+    );
+  }
+
   return (
     <p className="ml-auto flex items-center gap-1.5 truncate text-xs text-faint">
       {scanning && <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />}
       {scanning ? "Listening ahead…" : done ? `${done} min analyzed` : ""}
-      {detector && <span className="hidden sm:inline">· {detector === "claude" ? "Claude" : "on-device"} detection</span>}
+      {detector && (
+        <span className="hidden sm:inline">
+          · {detector === "claude" ? "Claude" : detector === "glm" ? "GLM" : "on-device"} detection
+        </span>
+      )}
     </p>
   );
 }

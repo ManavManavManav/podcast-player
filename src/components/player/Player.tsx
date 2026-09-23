@@ -52,7 +52,7 @@ function analyzedUntil(time: number): number {
   return w;
 }
 
-export function Player() {
+export function Player({ userId }: { userId: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const episode = usePlayer((s) => s.episode);
   const panelOpen = usePlayer((s) => s.panelOpen);
@@ -76,10 +76,22 @@ export function Player() {
     if (resume) void audioRef.current?.play().catch(() => {});
   }, []);
 
-  // Restore settings and the last episode from localStorage after mount.
+  // Restore this user's settings and last episode from localStorage after
+  // mount. Storage is per user, so people sharing a browser don't see each
+  // other's listening.
   useEffect(() => {
+    const name = `podblock-player:${userId}`;
+    try {
+      // History saved before accounts existed goes to the first user who signs in here.
+      const legacy = localStorage.getItem("podblock-player");
+      if (legacy && !localStorage.getItem(name)) localStorage.setItem(name, legacy);
+      localStorage.removeItem("podblock-player");
+    } catch {
+      // Storage unavailable (private mode); nothing to migrate.
+    }
+    usePlayer.persist.setOptions({ name });
     void usePlayer.persist.rehydrate();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     usePlayback.setState({ audio: audioRef.current });

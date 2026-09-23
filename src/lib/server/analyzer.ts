@@ -4,9 +4,11 @@ import path from "node:path";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { detectAds } from "@/lib/ads/heuristic";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
-import type { AdRange, AnalyzeResponse, CachedAnalysis, DetectorKind, TranscriptSegment } from "@/lib/types";
+import type { AdRange, AnalyzeResponse, CachedAnalysis, TranscriptSegment } from "@/lib/types";
 import { extractWindow } from "@/lib/server/audio";
-import { classifyWindow, claudeEnabled } from "@/lib/server/claudeDetector";
+import { classifyWithClaude } from "@/lib/server/llm/claude";
+import { classifyWithGlm } from "@/lib/server/llm/glm";
+import type { DetectorConfig } from "@/lib/server/settings";
 import { whisper } from "@/lib/server/whisper";
 
 /**
@@ -24,8 +26,12 @@ interface EpisodeRecord {
   url: string;
   /** Window start (seconds) → transcript segments in episode time. */
   windows: Record<number, TranscriptSegment[]>;
-  /** Window start → ads Claude found in it (absent if Claude wasn't used). */
-  claude: Record<number, AdRange[]>;
+  /**
+   * LLM verdicts, per "provider:model" (e.g. "glm:glm-4.7-flash"), then per
+   * window start. Kept separately so users with different settings never
+   * see each other's model's results, and replays never pay twice.
+   */
+  llm: Record<string, Record<number, AdRange[]>>;
 }
 
 function keyFor(url: string) {
@@ -62,11 +68,16 @@ function loadEpisode(url: string): Promise<EpisodeRecord> {
 async function readEpisode(url: string, key: string): Promise<EpisodeRecord> {
   try {
     const stored = JSON.parse(await fs.readFile(path.join(CACHE_DIR, `${key}.json`), "utf-8"));
-    if (stored.version === CACHE_VERSION && stored.url === url) return stored;
+    if (stored.version === CACHE_VERSION && stored.url === url) {
+      // Records from before per-model verdicts: keep the transcripts.
+      stored.llm ??= {};
+      delete stored.claude;
+      return stored;
+    }
   } catch {
     // Not cached yet.
   }
-  return { version: CACHE_VERSION, url, windows: {}, claude: {} };
+  return { version: CACHE_VERSION, url, windows: {}, llm: {} };
 }
 
 const pendingWrites = new Map<string, NodeJS.Timeout>();
@@ -156,8 +167,8 @@ async function transcribeWindow(
 
 // --- Detection -------------------------------------------------------------------
 
-export function detectorKind(): DetectorKind {
-  return claudeEnabled() ? "claude" : "heuristic";
+function verdictKey(detector: Exclude<DetectorConfig, { kind: "heuristic" }>) {
+  return `${detector.kind}:${detector.model}`;
 }
 
 function allSegments(record: EpisodeRecord): TranscriptSegment[] {
@@ -167,33 +178,49 @@ function allSegments(record: EpisodeRecord): TranscriptSegment[] {
     .flatMap((w) => record.windows[w]);
 }
 
-function computeAds(record: EpisodeRecord): AdRange[] {
+function computeAds(record: EpisodeRecord, detector: DetectorConfig): AdRange[] {
   const segments = allSegments(record);
   const heuristic = detectAds(segments);
-  if (detectorKind() === "heuristic") return heuristic;
+  if (detector.kind === "heuristic") return heuristic;
 
-  // Use Claude's answer where we have one, and the heuristic for any window
-  // Claude couldn't classify (e.g. a network error).
-  const fromClaude = Object.values(record.claude).flat();
+  // Use the model's answer where we have one, and the on-device detector for
+  // any window it couldn't classify (e.g. a network error or a bad key).
+  const verdicts = record.llm[verdictKey(detector)] ?? {};
+  const fromModel = Object.values(verdicts).flat();
   const uncovered = Object.keys(record.windows)
     .map(Number)
-    .filter((w) => !(w in record.claude));
+    .filter((w) => !(w in verdicts));
   const fallback = heuristic.filter((ad) =>
     uncovered.some((w) => ad.start < w + WINDOW_SECONDS && ad.end > w),
   );
-  return snapToSpeech(mergeRanges([...fromClaude, ...fallback], 2), segments);
+  return snapToSpeech(mergeRanges([...fromModel, ...fallback], 2), segments);
 }
 
-async function classifyWithClaude(record: EpisodeRecord, window: number, signal?: AbortSignal) {
-  if (detectorKind() !== "claude" || window in record.claude) return;
+/**
+ * The last failure per provider + key, so the listener can be told their key
+ * or model isn't working (detection quietly falls back to on-device).
+ */
+const detectorErrors = new Map<string, string>();
+const errorKey = (d: Exclude<DetectorConfig, { kind: "heuristic" }>) =>
+  `${verdictKey(d)}:${createHash("sha1").update(d.apiKey).digest("hex").slice(0, 12)}`;
+
+async function classify(record: EpisodeRecord, window: number, detector: DetectorConfig, signal?: AbortSignal) {
+  if (detector.kind === "heuristic") return;
+  const verdicts = (record.llm[verdictKey(detector)] ??= {});
+  if (window in verdicts) return;
+
   const segments = record.windows[window] ?? [];
   const context = record.windows[window - WINDOW_SECONDS] ?? [];
+  const run = detector.kind === "claude" ? classifyWithClaude : classifyWithGlm;
   try {
-    record.claude[window] = await classifyWindow(segments, context, signal);
+    verdicts[window] = await run(segments, context, detector, signal);
+    detectorErrors.delete(errorKey(detector));
     saveEpisode(record);
   } catch (err) {
-    if ((err as Error).name !== "AbortError") {
-      console.warn(`[podblock] Claude classification failed for window ${window}:`, (err as Error).message);
+    // A cancelled request (the listener seeked away) isn't a provider failure.
+    if (!signal?.aborted && (err as Error).name !== "AbortError") {
+      detectorErrors.set(errorKey(detector), (err as Error).message);
+      console.warn(`[podblock] ${detector.kind} classification failed for window ${window}:`, (err as Error).message);
     }
   }
 }
@@ -204,6 +231,7 @@ export async function analyzeWindow(
   url: string,
   window: number,
   language: string | undefined,
+  detector: DetectorConfig,
   signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
   const record = await loadEpisode(url);
@@ -226,24 +254,27 @@ export async function analyzeWindow(
     record.windows[window] = await task.wait(signal);
   }
 
-  await classifyWithClaude(record, window, signal);
+  await classify(record, window, detector, signal);
 
   return {
     window,
     segments: record.windows[window],
-    ads: computeAds(record),
-    detector: detectorKind(),
+    ads: computeAds(record, detector),
+    detector: detector.kind,
     cached,
+    ...(detector.kind !== "heuristic" && detectorErrors.has(errorKey(detector))
+      ? { detectorError: detectorErrors.get(errorKey(detector)) }
+      : {}),
   };
 }
 
 /** Everything already analyzed for an episode, without doing any new work. */
-export async function cachedAnalysis(url: string): Promise<CachedAnalysis> {
+export async function cachedAnalysis(url: string, detector: DetectorConfig): Promise<CachedAnalysis> {
   const record = await loadEpisode(url);
   return {
     windows: Object.keys(record.windows).map(Number).sort((a, b) => a - b),
     segments: allSegments(record),
-    ads: computeAds(record),
-    detector: detectorKind(),
+    ads: computeAds(record, detector),
+    detector: detector.kind,
   };
 }

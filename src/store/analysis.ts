@@ -13,6 +13,8 @@ interface AnalysisState {
   segments: TranscriptSegment[];
   ads: AdRange[];
   detector: DetectorKind | null;
+  /** The chosen AI provider is failing; on-device detection is covering. */
+  detectorError: string | null;
   /** Set when analysis keeps failing and the scanner has backed off. */
   error: string | null;
 
@@ -20,7 +22,13 @@ interface AnalysisState {
   setStatus: (window: number, status: WindowStatus) => void;
   /** Forget a window's status so the scanner can request it again. */
   clearStatus: (window: number) => void;
-  addWindow: (window: number, segments: TranscriptSegment[], ads: AdRange[], detector: DetectorKind) => void;
+  addWindow: (
+    window: number,
+    segments: TranscriptSegment[],
+    ads: AdRange[],
+    detector: DetectorKind,
+    detectorError?: string,
+  ) => void;
   setError: (error: string | null) => void;
   /** Merges previously analyzed windows fetched from the server cache. */
   restore: (cached: CachedAnalysis) => void;
@@ -32,9 +40,10 @@ export const useAnalysis = create<AnalysisState>()((set) => ({
   segments: [],
   ads: [],
   detector: null,
+  detectorError: null,
   error: null,
 
-  reset: (url) => set({ url, windows: {}, segments: [], ads: [], detector: null, error: null }),
+  reset: (url) => set({ url, windows: {}, segments: [], ads: [], detector: null, detectorError: null, error: null }),
 
   setStatus: (window, status) => set((s) => ({ windows: { ...s.windows, [window]: status } })),
 
@@ -45,7 +54,7 @@ export const useAnalysis = create<AnalysisState>()((set) => ({
       return { windows };
     }),
 
-  addWindow: (window, segments, ads, detector) =>
+  addWindow: (window, segments, ads, detector, detectorError) =>
     set((s) => ({
       windows: { ...s.windows, [window]: "done" },
       segments: [...s.segments.filter((seg) => seg.start < window || seg.start >= window + WINDOW_SECONDS), ...segments].sort(
@@ -53,6 +62,7 @@ export const useAnalysis = create<AnalysisState>()((set) => ({
       ),
       ads,
       detector,
+      detectorError: detectorError ?? null,
       error: null,
     })),
 

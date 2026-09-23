@@ -46,7 +46,7 @@ export interface AdRange {
   reason: string;
 }
 
-export type DetectorKind = "heuristic" | "claude";
+export type DetectorKind = "heuristic" | "glm" | "claude";
 
 /** Response of POST /api/analyze. */
 export interface AnalyzeResponse {
@@ -57,6 +57,8 @@ export interface AnalyzeResponse {
   ads: AdRange[];
   detector: DetectorKind;
   cached: boolean;
+  /** Set when the chosen AI provider failed and on-device detection was used instead. */
+  detectorError?: string;
 }
 
 /** Response of GET /api/analyze: everything already analyzed for an episode. */
@@ -65,6 +67,23 @@ export interface CachedAnalysis {
   segments: TranscriptSegment[];
   ads: AdRange[];
   detector: DetectorKind;
+}
+
+export type KeyStatus =
+  /** The user saved their own key (shown masked). */
+  | { status: "own"; masked: string }
+  /** No key of their own, but the server operator provided one. */
+  | { status: "shared" }
+  /** A stored key that can't be decrypted (the server secret changed). */
+  | { status: "unreadable" }
+  | { status: "none" };
+
+/** Response of GET/PUT /api/settings. Keys are never sent back in full. */
+export interface UserSettings {
+  detector: DetectorKind;
+  glmModel: string;
+  claudeModel: string;
+  keys: { zai: KeyStatus; anthropic: KeyStatus };
 }
 
 export interface HealthResponse {

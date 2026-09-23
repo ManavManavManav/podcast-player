@@ -57,6 +57,12 @@ check(
   "Add PODCAST_INDEX_API_SECRET to .env.local.",
 );
 
+check(
+  (env.BETTER_AUTH_SECRET ?? "").length >= 32,
+  "BETTER_AUTH_SECRET",
+  "Add one to .env.local: BETTER_AUTH_SECRET=$(openssl rand -base64 48)",
+);
+
 // Whisper model (downloaded automatically on first use; just informational)
 const model = env.WHISPER_MODEL || "base";
 const modelCached = existsSync(path.join(os.homedir(), ".cache", "whisper", `${model}.pt`));
@@ -70,7 +76,8 @@ for (const r of results) {
 console.log(
   `\n  Whisper model: ${model}${modelCached ? " (downloaded)" : " (will download on first play)"}`,
 );
-const claude = env.AD_DETECTOR !== "heuristic" && Boolean(env.ANTHROPIC_API_KEY);
-console.log(`  Ad detector:   ${claude ? `Claude (${env.CLAUDE_MODEL || "claude-opus-5"})` : "on-device heuristic"}\n`);
+const shared = [env.ZAI_API_KEY && "Z.ai", env.ANTHROPIC_API_KEY && "Anthropic"].filter(Boolean);
+console.log(`  Shared AI keys: ${shared.length ? shared.join(", ") : "none (users add their own in Settings)"}`);
+console.log(`  Sign-ups:      ${env.PODBLOCK_ALLOW_SIGNUPS === "false" ? "closed" : "open"}\n`);
 
 process.exit(results.every((r) => r.ok) ? 0 : 1);
