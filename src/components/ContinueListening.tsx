@@ -38,7 +38,7 @@ function RecentCard({ episode }: { episode: Episode }) {
   const progress = useEpisodeProgress(episode);
   return (
     <li className="w-64 shrink-0 snap-start">
-      <div className="flex gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card">
+      <div className="hover-wave flex gap-3 overflow-hidden rounded-2xl border border-border bg-surface p-3 shadow-card">
         <button onClick={() => play(episode)} className="group relative shrink-0" aria-label={`Play ${episode.title}`}>
           <Artwork src={episode.image} alt="" className="size-16 rounded-lg" />
           <span className="absolute inset-0 grid place-items-center rounded-lg bg-black/40 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">

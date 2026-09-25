@@ -34,11 +34,11 @@ function EpisodeRow({ episode }: { episode: Episode }) {
   ].filter(Boolean);
 
   return (
-    <li className="group relative flex gap-4 py-4">
+    <li className="hover-wave group flex gap-4 overflow-hidden py-4">
       <button
         onClick={onClick}
         aria-label={`${playing ? "Pause" : "Play"} ${episode.title}`}
-        className={`relative mt-0.5 grid size-11 shrink-0 place-items-center rounded-full transition ${
+        className={`hover-breathe relative z-[2] mt-0.5 grid size-11 shrink-0 place-items-center rounded-full ${
           isCurrent
             ? "bg-accent text-accent-text shadow-card"
             : "bg-surface-2 text-text group-hover:bg-accent group-hover:text-accent-text"

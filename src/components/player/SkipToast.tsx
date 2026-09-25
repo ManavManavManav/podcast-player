@@ -43,7 +43,7 @@ export function SkipToast({
         <span>
           {holding ? "Skipping ad break…" : `Skipped a ${formatDuration(notice.seconds)} ad`}
         </span>
-        <button onClick={onUndo} className="rounded-full bg-bg/15 px-3 py-1 text-xs font-semibold hover:bg-bg/25">
+        <button onClick={onUndo} className="hover-breathe rounded-full bg-bg/15 px-3 py-1 text-xs font-semibold hover:bg-bg/25">
           Undo
         </button>
       </div>

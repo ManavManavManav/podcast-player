@@ -67,7 +67,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           <button
             type="submit"
             disabled={busy}
-            className="flex h-10 items-center gap-2 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
+            className="hover-breathe flex h-10 items-center gap-2 rounded-full border border-border px-5 text-sm font-medium hover:bg-surface-2 disabled:opacity-50 [--hover-scale:1.04]"
           >
             {busy && <LoaderCircle className="size-4 animate-spin" />}
             Change password

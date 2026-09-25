@@ -13,7 +13,7 @@ export function LogoMark({ className = "size-7" }: { className?: string }) {
 
 export function Logo() {
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2 rounded-lg" aria-label="Podblock home">
+    <Link href="/" className="hover-breathe flex shrink-0 items-center gap-2 rounded-lg [--hover-scale:1.04]" aria-label="Podblock home">
       <LogoMark />
       <span className="hidden text-[17px] font-semibold tracking-tight sm:inline">Podblock</span>
     </Link>

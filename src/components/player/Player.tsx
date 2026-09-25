@@ -357,7 +357,7 @@ function PlayerBar() {
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="grid size-11 place-items-center rounded-full bg-accent text-accent-text shadow-card transition hover:brightness-110 active:scale-95"
+            className="hover-breathe grid size-11 place-items-center rounded-full bg-accent text-accent-text shadow-card [--hover-scale:1.08]"
           >
             {(buffering && playing) || holding ? (
               <LoaderCircle className="size-5 animate-spin" />
@@ -410,7 +410,7 @@ function SecondaryControls() {
         onClick={() => setAutoSkip(!autoSkip)}
         aria-pressed={autoSkip}
         title={autoSkip ? `Skipping ads · ${stats.adsSkipped} skipped so far` : "Ad skipping is off"}
-        className={`flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium transition ${
+        className={`hover-breathe flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium [--hover-scale:1.04] ${
           autoSkip ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2"
         }`}
       >
@@ -478,7 +478,7 @@ function SecondaryControls() {
         aria-pressed={panelOpen}
         aria-label="Transcript and ads"
         title="Transcript (T)"
-        className={`grid size-8 place-items-center rounded-full transition hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
+        className={`hover-breathe grid size-8 place-items-center rounded-full hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
       >
         <ScrollText className="size-4" />
       </button>
@@ -535,7 +535,7 @@ function IconButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`relative size-9 place-items-center rounded-full text-text transition hover:bg-surface-2 active:scale-95 ${className}`}
+      className={`hover-breathe relative size-9 place-items-center rounded-full text-text hover:bg-surface-2 ${className}`}
     >
       {children}
     </button>

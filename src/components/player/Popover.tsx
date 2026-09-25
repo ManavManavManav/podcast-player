@@ -41,7 +41,7 @@ export function Popover({
         aria-label={label}
         aria-expanded={open}
         aria-controls={id}
-        className={`flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition hover:bg-surface-2 ${
+        className={`hover-breathe flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium hover:bg-surface-2 [--hover-scale:1.05] ${
           open ? "bg-surface-2" : ""
         }`}
       >
@@ -76,7 +76,7 @@ export function MenuItem({
       role="menuitemradio"
       aria-checked={selected}
       onClick={onSelect}
-      className={`flex w-full items-center justify-between gap-4 rounded-lg px-3 py-1.5 text-left text-sm hover:bg-surface-2 ${
+      className={`hover-fill flex w-full items-center justify-between gap-4 rounded-lg px-3 py-1.5 text-left text-sm ${
         selected ? "font-semibold text-accent" : ""
       }`}
     >

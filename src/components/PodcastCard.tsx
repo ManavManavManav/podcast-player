@@ -6,13 +6,13 @@ export function PodcastCard({ podcast, priority = false }: { podcast: Podcast; p
   return (
     <Link
       href={`/podcast/${podcast.id}`}
-      className="group flex flex-col gap-2.5 rounded-2xl p-1.5 -m-1.5 transition hover:bg-surface-2/70"
+      className="hover-wave group -m-1.5 flex flex-col gap-2.5 overflow-hidden rounded-2xl p-1.5 transition-colors hover:bg-surface-2/70"
     >
       <Artwork
         src={podcast.image}
         alt=""
         priority={priority}
-        className="aspect-square w-full rounded-xl shadow-card transition group-hover:shadow-lg"
+        className="aspect-square w-full rounded-xl shadow-card transition-transform duration-300 ease-out group-hover:-translate-y-0.5"
       />
       <div className="min-w-0 px-0.5">
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{podcast.title}</h3>

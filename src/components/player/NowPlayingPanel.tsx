@@ -33,7 +33,7 @@ export function NowPlayingPanel() {
         <ScanStatus />
         <button
           onClick={() => setPanelOpen(false)}
-          className="rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-text"
+          className="hover-breathe rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-text"
           aria-label="Close panel"
         >
           <X className="size-4" />
@@ -50,7 +50,7 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex items-center rounded-full px-3 py-1 text-sm font-medium transition ${
+      className={`hover-breathe flex items-center rounded-full px-3 py-1 text-sm font-medium [--hover-scale:1.04] ${
         active ? "bg-surface-2 text-text" : "text-muted hover:text-text"
       }`}
     >
@@ -190,9 +190,9 @@ function TranscriptLine({
     <button
       data-index={index}
       onClick={() => onSeek(segment.start)}
-      className={`flex w-full gap-3 rounded-lg px-2 py-1 text-left text-[15px] leading-relaxed transition ${
+      className={`hover-fill flex w-full gap-3 rounded-lg px-2 py-1 text-left text-[15px] leading-relaxed ${
         active ? "bg-accent-soft text-text" : past ? "text-muted" : "text-text"
-      } ${ad ? "border-l-2 border-ad bg-ad-soft/60" : "hover:bg-surface-2"}`}
+      } ${ad ? "border-l-2 border-ad bg-ad-soft/60" : ""}`}
     >
       <span className="w-11 shrink-0 pt-0.5 text-right text-xs tabular-nums text-faint">{formatClock(segment.start)}</span>
       <span className="min-w-0 flex-1">{segment.text}</span>
@@ -231,7 +231,7 @@ function AdList() {
             <li key={ad.start}>
               <button
                 onClick={() => seek(ad.start)}
-                className="w-full rounded-xl border border-border px-3 py-2.5 text-left transition hover:bg-surface-2"
+                className="hover-wave w-full overflow-hidden rounded-xl border border-border px-3 py-2.5 text-left"
               >
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium tabular-nums">

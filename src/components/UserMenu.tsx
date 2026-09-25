@@ -38,7 +38,7 @@ export function UserMenu({ name, email, image }: { name: string; email: string; 
         onClick={() => setOpen((o) => !o)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="grid size-9 place-items-center overflow-hidden rounded-full bg-accent-soft text-sm font-semibold text-accent ring-offset-2 ring-offset-bg transition hover:ring-2 hover:ring-accent/40"
+        className="hover-breathe grid size-9 place-items-center overflow-hidden rounded-full bg-accent-soft text-sm font-semibold text-accent"
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -61,14 +61,14 @@ export function UserMenu({ name, email, image }: { name: string; email: string; 
             href="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm hover:bg-surface-2"
+            className="hover-fill flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm"
           >
             <Settings className="size-4 text-muted" /> Settings &amp; API keys
           </Link>
           <button
             role="menuitem"
             onClick={signOut}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2"
+            className="hover-fill flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm"
           >
             <LogOut className="size-4 text-muted" /> Sign out
           </button>

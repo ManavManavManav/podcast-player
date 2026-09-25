@@ -111,7 +111,7 @@ export function DetectorSettings({ initial }: { initial: UserSettings }) {
           return (
             <div
               key={option.kind}
-              className={`rounded-2xl border transition ${selected ? "border-accent bg-accent-soft/40" : "border-border bg-surface"}`}
+              className={`hover-wave overflow-hidden rounded-2xl border transition-colors ${selected ? "border-accent bg-accent-soft/40" : "border-border bg-surface"}`}
             >
               <button
                 role="radio"
@@ -164,7 +164,7 @@ export function DetectorSettings({ initial }: { initial: UserSettings }) {
         <button
           onClick={() => submit(false)}
           disabled={!dirty || busy !== null}
-          className="flex h-10 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-text shadow-card transition hover:brightness-110 disabled:opacity-50"
+          className="hover-breathe flex h-10 items-center gap-2 rounded-full bg-accent px-5 text-sm font-semibold text-accent-text shadow-card disabled:opacity-50 [--hover-scale:1.04]"
         >
           {busy === "save" && <LoaderCircle className="size-4 animate-spin" />}
           Save
@@ -173,7 +173,7 @@ export function DetectorSettings({ initial }: { initial: UserSettings }) {
           <button
             onClick={() => submit(true)}
             disabled={busy !== null}
-            className="flex h-10 items-center gap-2 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
+            className="hover-breathe flex h-10 items-center gap-2 rounded-full border border-border px-5 text-sm font-medium hover:bg-surface-2 disabled:opacity-50 [--hover-scale:1.04]"
           >
             {busy === "test" && <LoaderCircle className="size-4 animate-spin" />}
             {dirty ? "Save & test" : "Test"}

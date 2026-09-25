@@ -126,11 +126,106 @@ body {
   animation: toast-in 180ms ease-out;
 }
 
+/* ---------------------------------------------------------------------------
+   Hover motion. Only transform/opacity animate (compositor-only, so no jank),
+   and only on devices with a real pointer: a tap on a phone would leave
+   :hover "stuck" on and the element breathing.
+
+   .hover-breathe  springs up quickly, then breathes gently while hovered.
+                   Size with --hover-scale (default 1.06; wide buttons ~1.02).
+   .hover-wave     a soft sheen sweeps across once (cards, rows).
+   .hover-fill     the hover background flows in from the left (lists).
+   ------------------------------------------------------------------------- */
+
+:root {
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --sheen: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.hover-breathe {
+  transition:
+    scale 220ms var(--spring),
+    background-color 150ms ease,
+    color 150ms ease,
+    opacity 150ms ease;
+}
+
+.hover-wave {
+  position: relative;
+  isolation: isolate;
+}
+.hover-wave::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, var(--sheen) 50%, transparent 65%);
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+.hover-fill {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  transition: background-size 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hover-breathe:hover {
+    scale: var(--hover-scale, 1.06);
+    /* `transform` composes with `scale`, so the breath rides on the spring. */
+    animation: breathe 2.4s ease-in-out 220ms infinite;
+  }
+  .hover-wave:hover::after {
+    animation: wave 750ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hover-fill:hover {
+    background-size: 100% 100%;
+  }
+}
+
+.hover-breathe:active {
+  scale: calc(2 - var(--hover-scale, 1.06));
+  transition-duration: 90ms;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.975);
+  }
+}
+
+@keyframes wave {
+  0% {
+    opacity: 1;
+    transform: translateX(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* A near-zero duration would make infinite animations strobe. */
+  .hover-breathe:hover,
+  .hover-wave:hover::after {
+    animation: none !important;
+  }
+  .hover-breathe:hover {
+    scale: none;
   }
 }

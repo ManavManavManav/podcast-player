@@ -59,7 +59,7 @@ export function AuthForm({
                 type="button"
                 disabled={pending}
                 onClick={() => authClient.signIn.social({ provider, callbackURL: next })}
-                className="h-10 rounded-full border border-border text-sm font-medium transition hover:bg-surface-2 disabled:opacity-60"
+                className="hover-breathe h-10 rounded-full border border-border text-sm font-medium hover:bg-surface-2 disabled:opacity-60 [--hover-scale:1.02]"
               >
                 Continue with {PROVIDER_LABELS[provider]}
               </button>
@@ -110,7 +110,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="mt-1 flex h-11 items-center justify-center gap-2 rounded-full bg-accent text-sm font-semibold text-accent-text shadow-card transition hover:brightness-110 disabled:opacity-60"
+          className="hover-breathe mt-1 flex h-11 items-center justify-center gap-2 rounded-full bg-accent text-sm font-semibold text-accent-text shadow-card disabled:opacity-60 [--hover-scale:1.02]"
         >
           {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
           {signup ? "Create account" : "Sign in"}
