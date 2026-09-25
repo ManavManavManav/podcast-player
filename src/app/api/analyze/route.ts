@@ -5,9 +5,22 @@ import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 import { requireUser } from "@/lib/server/session";
 import { detectorFor } from "@/lib/server/settings";
+import type { EpisodeContext } from "@/lib/types";
 
 /** 12 hours: longer than any real episode, short enough to reject junk. */
 const MAX_START = 12 * 3600;
+
+/** Episode details from the client. Only hints for the detectors, so just bounded. */
+function episodeContext(input: Record<string, unknown> | URLSearchParams): EpisodeContext {
+  const get = (key: string) => (input instanceof URLSearchParams ? input.get(key) : input[key]);
+  const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim().slice(0, 300) : undefined);
+  const website = text(get("website"));
+  return {
+    podcastTitle: text(get("podcastTitle")),
+    episodeTitle: text(get("episodeTitle")),
+    website: website && isHttpUrl(website) ? website : undefined,
+  };
+}
 
 /** What's already known about an episode, so a returning listener sees it at once. */
 export async function GET(req: NextRequest) {
@@ -18,7 +31,7 @@ export async function GET(req: NextRequest) {
   if (!isHttpUrl(url)) {
     return NextResponse.json({ error: "`url` must be an http(s) URL" }, { status: 400 });
   }
-  return NextResponse.json(await cachedAnalysis(url, detectorFor(user.id)));
+  return NextResponse.json(await cachedAnalysis(url, detectorFor(user.id), episodeContext(req.nextUrl.searchParams)));
 }
 
 /** Analyzes one window of an episode (or returns it from the cache). */
@@ -28,7 +41,7 @@ export async function POST(req: NextRequest) {
   const user = await requireUser();
   if (user instanceof NextResponse) return user;
 
-  let body: { url?: unknown; window?: unknown; language?: unknown };
+  let body: { url?: unknown; window?: unknown; language?: unknown; episode?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -61,6 +74,7 @@ export async function POST(req: NextRequest) {
       window,
       whisperLanguage(typeof language === "string" ? language : undefined),
       detectorFor(user.id),
+      episodeContext(body.episode && typeof body.episode === "object" ? (body.episode as Record<string, unknown>) : {}),
       req.signal,
     );
     return NextResponse.json(result);

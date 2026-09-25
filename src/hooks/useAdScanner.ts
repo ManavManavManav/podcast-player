@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { LOOKAHEAD_WINDOWS, WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
-import type { AnalyzeResponse } from "@/lib/types";
+import type { AnalyzeResponse, EpisodeContext } from "@/lib/types";
 import { useAnalysis } from "@/store/analysis";
 import { usePlayback, usePlayer } from "@/store/player";
 
@@ -11,6 +11,16 @@ const CONCURRENCY = 2;
 /** After this many failures in a row, stop and surface the error. */
 const MAX_CONSECUTIVE_ERRORS = 3;
 const RETRY_DELAY_MS = 8_000;
+
+/** What's playing, so detectors can tell the show's own plugs and topic from ads. */
+function currentEpisodeContext(): EpisodeContext {
+  const episode = usePlayer.getState().episode;
+  return {
+    podcastTitle: episode?.podcastTitle || undefined,
+    episodeTitle: episode?.title || undefined,
+    website: episode?.podcastLink || undefined,
+  };
+}
 
 /**
  * Keeps the transcript analyzed from the playhead up to a few minutes ahead,
@@ -37,7 +47,9 @@ export function useAdScanner(enabled: boolean) {
     failures.current = 0;
     if (url) {
       // Show whatever was analyzed on a previous listen right away.
-      void fetch(`/api/analyze?url=${encodeURIComponent(url)}`)
+      const params = new URLSearchParams({ url });
+      for (const [key, value] of Object.entries(currentEpisodeContext())) if (value) params.set(key, value);
+      void fetch(`/api/analyze?${params}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((cached) => {
           if (cached && useAnalysis.getState().url === url) useAnalysis.getState().restore(cached);
@@ -93,7 +105,7 @@ export function useAdScanner(enabled: boolean) {
       void fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, window: w, language }),
+        body: JSON.stringify({ url, window: w, language, episode: currentEpisodeContext() }),
         signal: controller.signal,
       })
         .then(async (res) => {

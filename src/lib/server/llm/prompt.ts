@@ -1,11 +1,23 @@
-import type { AdRange, TranscriptSegment } from "@/lib/types";
+import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
 
 /** Instructions and parsing shared by every LLM ad classifier. */
 
+/**
+ * Part of the verdict cache key: changing the instructions below should bump
+ * it, so verdicts from the old instructions are redone rather than reused.
+ */
+export const PROMPT_VERSION = 2;
+
 export const SYSTEM_PROMPT = `You find advertisements in podcast transcripts so a player can skip them.
 
-Count as an ad: sponsor reads by the hosts, dynamically inserted commercials, promos for other podcasts or shows, and "support for this show comes from" style credits, including the lead-in sentence that introduces the sponsor.
-Not an ad: the show's own content, the hosts talking about a product as part of the discussion, or plugs for the show's own newsletter, Patreon or social accounts that are shorter than a sentence or two.
+An ad promotes a sponsor's product or service. Count as an ad: sponsor reads by the hosts ("this episode is brought to you by…", "thanks to our partner…"), dynamically inserted commercials, promos for other podcasts or shows, and "support for this show comes from" credits, including the lead-in sentence that introduces the sponsor.
+
+Not an ad:
+- Brands, products or companies the hosts discuss as part of the conversation. This especially includes the episode's own subject: an episode about a company will mention it constantly, and none of that is an ad.
+- The show's own plugs: its website, newsletter, email list, Slack or Discord, merch, companion material, Patreon or social accounts.
+- The show's own disclaimers, such as "this is not investment advice".
+
+When you're unsure, don't flag it: a missed ad costs the listener a few seconds, but skipping real content is worse.
 
 You receive timestamped transcript lines. Lines marked CONTEXT come from just before the window and are for reference only: never report a range that starts before the first WINDOW line. Report each ad as start/end times in seconds taken from the line timestamps, covering the whole ad from its first line to its last. If an ad runs to the end of the window, end it at the last line's end time. If there are no ads, return an empty list.`;
 
@@ -37,10 +49,25 @@ export const OUTPUT_SCHEMA = {
 /** How much of the previous window is sent as context. */
 const CONTEXT_LINES = 12;
 
-export function formatTranscript(window: TranscriptSegment[], context: TranscriptSegment[]): string {
+export function formatTranscript(
+  window: TranscriptSegment[],
+  context: TranscriptSegment[],
+  episode: EpisodeContext = {},
+): string {
   const lines = (segments: TranscriptSegment[], tag: string) =>
     segments.map((s) => `${tag} [${s.start.toFixed(1)}-${s.end.toFixed(1)}] ${s.text}`).join("\n");
-  return [lines(context.slice(-CONTEXT_LINES), "CONTEXT"), lines(window, "WINDOW")].filter(Boolean).join("\n");
+  const about = [
+    episode.podcastTitle && `Podcast: ${episode.podcastTitle}`,
+    episode.episodeTitle && `Episode: ${episode.episodeTitle}`,
+    episode.website && `Show website: ${episode.website}`,
+  ].filter(Boolean);
+  return [
+    about.length ? `${about.join("\n")}\n` : "",
+    lines(context.slice(-CONTEXT_LINES), "CONTEXT"),
+    lines(window, "WINDOW"),
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 /**

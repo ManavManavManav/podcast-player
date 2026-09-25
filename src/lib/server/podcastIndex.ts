@@ -131,6 +131,7 @@ function toEpisode(ep: RawEpisode, podcast?: Podcast): Episode {
     episode: ep.episode || null,
     podcastId: ep.feedId,
     podcastTitle: podcast?.title ?? ep.feedTitle ?? "",
+    podcastLink: podcast?.link ?? "",
     language: ep.feedLanguage || podcast?.language || "",
   };
 }

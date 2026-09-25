@@ -1,4 +1,4 @@
-import type { AdRange, TranscriptSegment } from "@/lib/types";
+import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import { JSON_INSTRUCTIONS, SYSTEM_PROMPT, formatTranscript, parseAds } from "@/lib/server/llm/prompt";
 
 /** Free on Z.ai's API (rate-limited). */
@@ -51,6 +51,7 @@ export async function classifyWithGlm(
   context: TranscriptSegment[],
   { apiKey, model }: { apiKey: string; model: string },
   signal?: AbortSignal,
+  episode: EpisodeContext = {},
 ): Promise<AdRange[]> {
   if (window.length === 0) return [];
 
@@ -62,7 +63,7 @@ export async function classifyWithGlm(
         model,
         messages: [
           { role: "system", content: `${SYSTEM_PROMPT}\n\n${JSON_INSTRUCTIONS}` },
-          { role: "user", content: formatTranscript(window, context) },
+          { role: "user", content: formatTranscript(window, context, episode) },
         ],
         // A simple classification: no reasoning where the model allows it,
         // the least it will do otherwise.

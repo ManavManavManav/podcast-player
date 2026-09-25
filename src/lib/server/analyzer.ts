@@ -2,12 +2,13 @@ import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { WINDOW_SECONDS } from "@/lib/analysis";
-import { detectAds } from "@/lib/ads/heuristic";
+import { detectAds, siteName } from "@/lib/ads/heuristic";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
-import type { AdRange, AnalyzeResponse, CachedAnalysis, TranscriptSegment } from "@/lib/types";
+import type { AdRange, AnalyzeResponse, CachedAnalysis, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import { extractWindow } from "@/lib/server/audio";
 import { classifyWithClaude } from "@/lib/server/llm/claude";
 import { classifyWithGlm } from "@/lib/server/llm/glm";
+import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import type { DetectorConfig } from "@/lib/server/settings";
 import { whisper } from "@/lib/server/whisper";
 
@@ -168,7 +169,8 @@ async function transcribeWindow(
 // --- Detection -------------------------------------------------------------------
 
 function verdictKey(detector: Exclude<DetectorConfig, { kind: "heuristic" }>) {
-  return `${detector.kind}:${detector.model}`;
+  // Verdicts from older instructions are redone, not reused.
+  return `${detector.kind}:${detector.model}:p${PROMPT_VERSION}`;
 }
 
 function allSegments(record: EpisodeRecord): TranscriptSegment[] {
@@ -178,9 +180,17 @@ function allSegments(record: EpisodeRecord): TranscriptSegment[] {
     .flatMap((w) => record.windows[w]);
 }
 
-function computeAds(record: EpisodeRecord, detector: DetectorConfig): AdRange[] {
+/** The show's own site names, which the on-device detector won't treat as ad evidence. */
+function ownSites(episode: EpisodeContext): string[] {
+  const fromTitle = episode.podcastTitle?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return [siteName(episode.website), fromTitle && fromTitle.length >= 3 && fromTitle.length <= 30 ? fromTitle : null].filter(
+    (name): name is string => Boolean(name),
+  );
+}
+
+function computeAds(record: EpisodeRecord, detector: DetectorConfig, episode: EpisodeContext): AdRange[] {
   const segments = allSegments(record);
-  const heuristic = detectAds(segments);
+  const heuristic = detectAds(segments, { ownSites: ownSites(episode) });
   if (detector.kind === "heuristic") return heuristic;
 
   // Use the model's answer where we have one, and the on-device detector for
@@ -204,7 +214,13 @@ const detectorErrors = new Map<string, string>();
 const errorKey = (d: Exclude<DetectorConfig, { kind: "heuristic" }>) =>
   `${verdictKey(d)}:${createHash("sha1").update(d.apiKey).digest("hex").slice(0, 12)}`;
 
-async function classify(record: EpisodeRecord, window: number, detector: DetectorConfig, signal?: AbortSignal) {
+async function classify(
+  record: EpisodeRecord,
+  window: number,
+  detector: DetectorConfig,
+  episode: EpisodeContext,
+  signal?: AbortSignal,
+) {
   if (detector.kind === "heuristic") return;
   const verdicts = (record.llm[verdictKey(detector)] ??= {});
   if (window in verdicts) return;
@@ -213,7 +229,7 @@ async function classify(record: EpisodeRecord, window: number, detector: Detecto
   const context = record.windows[window - WINDOW_SECONDS] ?? [];
   const run = detector.kind === "claude" ? classifyWithClaude : classifyWithGlm;
   try {
-    verdicts[window] = await run(segments, context, detector, signal);
+    verdicts[window] = await run(segments, context, detector, signal, episode);
     detectorErrors.delete(errorKey(detector));
     saveEpisode(record);
   } catch (err) {
@@ -232,6 +248,7 @@ export async function analyzeWindow(
   window: number,
   language: string | undefined,
   detector: DetectorConfig,
+  episode: EpisodeContext,
   signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
   const record = await loadEpisode(url);
@@ -254,12 +271,12 @@ export async function analyzeWindow(
     record.windows[window] = await task.wait(signal);
   }
 
-  await classify(record, window, detector, signal);
+  await classify(record, window, detector, episode, signal);
 
   return {
     window,
     segments: record.windows[window],
-    ads: computeAds(record, detector),
+    ads: computeAds(record, detector, episode),
     detector: detector.kind,
     cached,
     ...(detector.kind !== "heuristic" && detectorErrors.has(errorKey(detector))
@@ -269,12 +286,16 @@ export async function analyzeWindow(
 }
 
 /** Everything already analyzed for an episode, without doing any new work. */
-export async function cachedAnalysis(url: string, detector: DetectorConfig): Promise<CachedAnalysis> {
+export async function cachedAnalysis(
+  url: string,
+  detector: DetectorConfig,
+  episode: EpisodeContext,
+): Promise<CachedAnalysis> {
   const record = await loadEpisode(url);
   return {
     windows: Object.keys(record.windows).map(Number).sort((a, b) => a - b),
     segments: allSegments(record),
-    ads: computeAds(record, detector),
+    ads: computeAds(record, detector, episode),
     detector: detector.kind,
   };
 }

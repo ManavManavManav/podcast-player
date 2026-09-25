@@ -57,7 +57,7 @@ const SIGNALS: Signal[] = [
     weight: 5,
     label: "sponsor thanks",
     pattern:
-      /\b(?:thank|thanks to|shout out to|i'd like to thank) (?:our|today's|this week's|this episode's|the) (?:first |second |third |next |final |last )?sponsors?\b|\bour (?:first|second|third|next|final|last) sponsor\b|\ba (?:quick )?word from (?:our|today's) sponsors?\b/g,
+      /\b(?:thank|thanks to|shout out to|i'd like to thank) (?:our|today's|this week's|this episode's|the) (?:first |second |third |next |final |last |brand new |new )?(?:presenting )?(?:sponsors?|partners?)\b|\bour (?:first|second|third|next|final|last) sponsor\b|\ba (?:quick )?word from (?:our|today's) sponsors?\b/g,
   },
   {
     kind: "intro",
@@ -113,7 +113,7 @@ const SIGNALS: Signal[] = [
     weight: 4,
     label: "legal disclaimer",
     pattern:
-      /\b(?:terms|restrictions|exclusions|conditions|fees)(?: and (?:conditions|limitations|restrictions))? (?:may )?apply\b|\bsee (?:site|store|[a-z0-9-]+ ?(?:\.|dot) ?com)? ?for (?:full )?details\b|\bvary by state\b|\bnot available in (?:all|every) (?:states?|areas?)\b|\bmember fdic\b|\bnot a bank\b|\bno purchase necessary\b|\bvoid where prohibited\b|\bmust be (?:18|21)\b|\bgambling problem\b|\bsubject to (?:credit approval|approval|terms)\b|\bterms and qualifications\b|\binsurance (?:sold|offered|underwritten) by\b|\binsurance company and affiliates\b|\bads? (?:are|is) selected\b|\bpast performance\b|\bnot (?:financial|investment) advice\b/g,
+      /\b(?:terms|restrictions|exclusions|conditions|fees)(?: and (?:conditions|limitations|restrictions))? (?:may )?apply\b|\bsee (?:site|store|[a-z0-9-]+ ?(?:\.|dot) ?com)? ?for (?:full )?details\b|\bvary by state\b|\bnot available in (?:all|every) (?:states?|areas?)\b|\bmember fdic\b|\bnot a bank\b|\bno purchase necessary\b|\bvoid where prohibited\b|\bmust be (?:18|21)\b|\bgambling problem\b|\bsubject to (?:credit approval|approval|terms)\b|\bterms and qualifications\b|\binsurance (?:sold|offered|underwritten) by\b|\binsurance company and affiliates\b|\bads? (?:are|is) selected\b/g,
   },
   {
     kind: "pitch",
@@ -121,7 +121,7 @@ const SIGNALS: Signal[] = [
     label: "ad copy",
     // Lines lifted from display or radio ads.
     pattern:
-      /\b(?:click|tap) (?:the|this) (?:banner|link|ad)\b|\bat (?:your|a) (?:local |nearest |participating )?[a-z]+ (?:dealer|dealership|retailer)s?\b|\bat participating (?:locations|restaurants|stores)\b|\bwherever (?:you get your )?podcasts? (?:are|is)? ?(?:available|sold)\b/g,
+      /\b(?:click|tap) (?:the|this) (?:banner|ad)\b|\bat (?:your|a) (?:local |nearest |participating )?[a-z]+ (?:dealer|dealership|retailer)s?\b|\bat participating (?:locations|restaurants|stores)\b|\bwherever (?:you get your )?podcasts? (?:are|is)? ?(?:available|sold)\b/g,
   },
   {
     kind: "pitch",
@@ -157,6 +157,49 @@ const COMMERCIAL_LABELS = new Set(["special offer", "legal disclaimer", "promo c
 const AD_ONLY_LABELS = new Set(["ad copy", "legal disclaimer", "promo code"]);
 /** How close (seconds) a weak snippet must be to a confirmed ad to join it. */
 const ADJACENT = 5;
+export interface DetectOptions {
+  /**
+   * Names of the show's own sites ("acquired" for acquired.fm). A host
+   * plugging their own website, newsletter or Slack isn't advertising.
+   */
+  ownSites?: string[];
+}
+
+/** "https://www.acquired.fm/episodes" → "acquired". */
+export function siteName(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const labels = new URL(url).hostname.toLowerCase().replace(/^www\./, "").split(".");
+    return labels.length >= 2 ? labels.at(-2)! : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whisper often mangles names ("acquire.fm"), so allow a small edit distance. */
+function similar(a: string, b: string): boolean {
+  if (a === b) return true;
+  const allowed = Math.min(a.length, b.length) >= 8 ? 2 : 1;
+  if (Math.abs(a.length - b.length) > allowed) return false;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[b.length] <= allowed;
+}
+
+const URL_NAME = new RegExp(String.raw`([a-z0-9-]{2,})\s?(?:\.|\bdot\b)\s?${TLD}\b`);
+
+/** True if the matched text names one of the show's own sites. */
+function mentionsOwnSite(text: string, ownSites: string[]): boolean {
+  const name = URL_NAME.exec(text)?.[1]?.replace(/-/g, "");
+  return Boolean(name) && ownSites.some((own) => similar(name!, own));
+}
+
 export interface Hit {
   kind: SignalKind;
   weight: number;
@@ -222,7 +265,8 @@ function sentenceStart(text: string, offset: number): number {
   return offset;
 }
 
-export function findHits(segments: TranscriptSegment[]): Hit[] {
+export function findHits(segments: TranscriptSegment[], options: DetectOptions = {}): Hit[] {
+  const ownSites = (options.ownSites ?? []).map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, "")).filter(Boolean);
   const sorted = [...segments].sort((a, b) => a.start - b.start);
   if (sorted.length === 0) return [];
   const index = indexSegments(sorted);
@@ -234,7 +278,9 @@ export function findHits(segments: TranscriptSegment[]): Hit[] {
       // "Today's episode is brought to you by": the ad starts with the sentence.
       if (signal.kind === "intro") fromOffset = sentenceStart(index.text, fromOffset);
       const toOffset = match.index + match[0].length;
-      if (index.text.slice(fromOffset, toOffset).includes("¶")) continue;
+      const matched = index.text.slice(fromOffset, toOffset);
+      if (matched.includes("¶")) continue;
+      if (signal.kind === "pitch" && ownSites.length && mentionsOwnSite(matched, ownSites)) continue;
       const from = locate(index, fromOffset);
       const to = locate(index, Math.max(fromOffset, toOffset - 1));
       hits.push({
@@ -282,8 +328,8 @@ function clusterStart(cluster: Hit[]): number {
   return intros.length ? Math.min(...intros.map((h) => h.start)) : afterBreak;
 }
 
-export function detectAds(segments: TranscriptSegment[]): AdRange[] {
-  const hits = findHits(segments);
+export function detectAds(segments: TranscriptSegment[], options: DetectOptions = {}): AdRange[] {
+  const hits = findHits(segments, options);
   const ranges: AdRange[] = [];
 
   let cluster: Hit[] = [];

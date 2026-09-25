@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { classifyWithGlm, supportsJsonMode } from "@/lib/server/llm/glm";
-import { parseAds } from "@/lib/server/llm/prompt";
+import { formatTranscript, parseAds } from "@/lib/server/llm/prompt";
 
 const window = [
   { start: 0, end: 4, text: "This episode is brought to you by Acme." },
@@ -95,5 +95,25 @@ describe("parseAds", () => {
   });
   it("throws when there's no JSON", () => {
     expect(() => parseAds("I couldn't find any ads.", window)).toThrow("didn't return JSON");
+  });
+});
+
+describe("formatTranscript", () => {
+  it("tells the model what the episode is about", () => {
+    const text = formatTranscript(window, [], {
+      podcastTitle: "Acquired",
+      episodeTitle: "The Home Depot",
+      website: "https://acquired.fm",
+    });
+    expect(text.split("\n").slice(0, 3)).toEqual([
+      "Podcast: Acquired",
+      "Episode: The Home Depot",
+      "Show website: https://acquired.fm",
+    ]);
+    expect(text).toContain("WINDOW [0.0-4.0]");
+  });
+
+  it("omits episode details it doesn't have", () => {
+    expect(formatTranscript(window, [])).toMatch(/^WINDOW/);
   });
 });

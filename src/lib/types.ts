@@ -26,6 +26,8 @@ export interface Episode {
   episode: number | null;
   podcastId: number;
   podcastTitle: string;
+  /** The show's website, if the feed has one. Missing on episodes saved by older versions. */
+  podcastLink?: string;
   language: string;
 }
 
@@ -47,6 +49,17 @@ export interface AdRange {
 }
 
 export type DetectorKind = "heuristic" | "glm" | "claude";
+
+/**
+ * What the episode is, so detectors can tell the show's own plugs and the
+ * episode's subject apart from ads. All hints; any may be missing.
+ */
+export interface EpisodeContext {
+  podcastTitle?: string;
+  episodeTitle?: string;
+  /** The show's website, e.g. "https://www.acquired.fm". */
+  website?: string;
+}
 
 /** Response of POST /api/analyze. */
 export interface AnalyzeResponse {

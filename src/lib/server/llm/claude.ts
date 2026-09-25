@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AdRange, TranscriptSegment } from "@/lib/types";
+import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import { OUTPUT_SCHEMA, SYSTEM_PROMPT, formatTranscript, parseAds } from "@/lib/server/llm/prompt";
 
 export const DEFAULT_CLAUDE_MODEL = "claude-opus-5";
@@ -26,6 +26,7 @@ export async function classifyWithClaude(
   context: TranscriptSegment[],
   { apiKey, model }: { apiKey: string; model: string },
   signal?: AbortSignal,
+  episode: EpisodeContext = {},
 ): Promise<AdRange[]> {
   if (window.length === 0) return [];
 
@@ -35,7 +36,7 @@ export async function classifyWithClaude(
       model,
       max_tokens: 4000,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: formatTranscript(window, context) }],
+      messages: [{ role: "user", content: formatTranscript(window, context, episode) }],
       output_config: {
         // Short classification: little reasoning needed.
         ...(/haiku/.test(model) ? {} : { effort: "low" as const }),

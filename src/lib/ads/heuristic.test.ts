@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectAds } from "@/lib/ads/heuristic";
+import { detectAds, siteName } from "@/lib/ads/heuristic";
 import type { TranscriptSegment } from "@/lib/types";
 
 /**
@@ -178,6 +178,39 @@ describe("detectAds", () => {
     expect(detectAds(segments)).toEqual([]);
   });
 
+  it("doesn't treat the show plugging its own site, email list and Slack as an ad", () => {
+    // Modeled on Acquired's intro, which previously got flagged.
+    const segments = [
+      ...chatter(5, 0),
+      ...transcript(
+        [
+          "So for all of you who have been asking for visuals, you are in luck.",
+          "You can click the link in the show notes",
+          "or go to library.acquired.fm to get access to all the charts.",
+          "You can join the email list at acquire.fm slash email.",
+          "That's where we send behind the scenes photos. That is acquired.fm slash email.",
+          "Join the Slack at acquired.fm slash Slack.",
+          "This show is not investment advice.",
+        ],
+        20,
+      ),
+      ...chatter(20, 48),
+    ];
+    expect(detectAds(segments, { ownSites: [siteName("https://www.acquired.fm")!] })).toEqual([]);
+  });
+
+  it("still flags another company's promo link on a show with its own site", () => {
+    const segments = [
+      ...chatter(5, 0),
+      ...transcript(
+        ["This episode is brought to you by Acme.", "Go to acme.com slash acquired and use code ACQ for 20% off."],
+        20,
+      ),
+      ...chatter(10, 28),
+    ];
+    expect(detectAds(segments, { ownSites: ["acquired"] })).toHaveLength(1);
+  });
+
   it("extends the end over the pause before speech resumes", () => {
     const segments = [
       ...transcript(
@@ -189,5 +222,14 @@ describe("detectAds", () => {
     ];
     const [ad] = detectAds(segments);
     expect(ad.end).toBe(10.5);
+  });
+});
+
+describe("siteName", () => {
+  it("takes the name before the TLD", () => {
+    expect(siteName("https://www.acquired.fm/episodes")).toBe("acquired");
+    expect(siteName("https://library.acquired.fm")).toBe("acquired");
+    expect(siteName("not a url")).toBeNull();
+    expect(siteName(undefined)).toBeNull();
   });
 });
