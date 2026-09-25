@@ -121,14 +121,14 @@ export function AuthForm({
         {signup ? (
           <>
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-accent hover:underline">
+            <Link href="/login" className="font-medium underline underline-offset-4 hover:text-muted">
               Sign in
             </Link>
           </>
         ) : signupsAllowed ? (
           <>
             New here?{" "}
-            <Link href="/signup" className="font-medium text-accent hover:underline">
+            <Link href="/signup" className="font-medium underline underline-offset-4 hover:text-muted">
               Create an account
             </Link>
           </>

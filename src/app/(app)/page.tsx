@@ -9,7 +9,7 @@ export default function HomePage() {
     <div className="space-y-14">
       <section className="mx-auto max-w-2xl pt-6 text-center sm:pt-12">
         <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">
-          Podcasts, <span className="text-accent">minus the ads.</span>
+          Podcasts, <span className="text-muted">minus the ads.</span>
         </h1>
         <p className="mx-auto mt-4 max-w-lg text-pretty text-muted sm:text-lg">
           Podblock listens a few minutes ahead of you, spots sponsor reads and inserted ads, and skips

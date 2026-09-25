@@ -14,7 +14,7 @@ export default async function SignupPage() {
       <div className="rounded-2xl border border-border bg-surface p-6 text-center shadow-card">
         <h1 className="text-lg font-semibold">Sign-ups are closed</h1>
         <p className="mt-2 text-sm text-muted">Ask whoever runs this Podblock server to create an account for you.</p>
-        <Link href="/login" className="mt-5 inline-block text-sm font-medium text-accent hover:underline">
+        <Link href="/login" className="mt-5 inline-block text-sm font-medium underline underline-offset-4 hover:text-muted">
           Back to sign in
         </Link>
       </div>

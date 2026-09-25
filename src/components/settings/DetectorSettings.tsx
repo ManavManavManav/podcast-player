@@ -239,7 +239,7 @@ function KeyField({
     <div className="grid gap-1.5">
       <span className="flex items-baseline justify-between gap-3 text-sm font-medium">
         API key
-        <a href={link.href} target="_blank" rel="noreferrer" className="text-xs font-normal text-accent hover:underline">
+        <a href={link.href} target="_blank" rel="noreferrer" className="text-xs font-normal underline underline-offset-4 hover:text-muted">
           {link.label}
         </a>
       </span>
