@@ -4,6 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "@/lib/authClient";
+import { safeNext } from "@/lib/redirect";
 
 type Mode = "login" | "signup";
 
@@ -24,6 +25,8 @@ export function AuthForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const signup = mode === "signup";
+  // Checked again here, since this is where the browser is actually sent.
+  const destination = safeNext(next);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +41,7 @@ export function AuthForm({
       return;
     }
     // A full navigation, so every server component sees the new session.
-    window.location.assign(next);
+    window.location.assign(destination);
   };
 
   return (
@@ -56,7 +59,7 @@ export function AuthForm({
                 key={provider}
                 type="button"
                 disabled={pending}
-                onClick={() => authClient.signIn.social({ provider, callbackURL: next })}
+                onClick={() => authClient.signIn.social({ provider, callbackURL: destination })}
                 className="hover-breathe h-11 rounded-full border border-accent text-sm font-medium disabled:opacity-60 [--hover-scale:1.02]"
               >
                 Continue with {PROVIDER_LABELS[provider]}
