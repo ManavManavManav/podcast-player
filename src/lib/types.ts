@@ -67,6 +67,8 @@ export interface AnalyzeResponse {
   /** Every ad found in the episode so far, not just in this window. */
   ads: AdRange[];
   cached: boolean;
+  /** The audio ends before this window: there's nothing more to analyze. */
+  end?: boolean;
 }
 
 /** Response of GET /api/analyze: everything already analyzed for an episode. */

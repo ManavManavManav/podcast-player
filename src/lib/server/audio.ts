@@ -106,6 +106,21 @@ export async function extractWindow(
   }
 }
 
+/**
+ * False for a FLAC stream that's only metadata, which is what ffmpeg writes
+ * when asked for audio past the end of a file. True when unsure.
+ */
+export function hasAudioFrames(flac: Buffer): boolean {
+  if (flac.subarray(0, 4).toString("latin1") !== "fLaC") return true;
+  let offset = 4;
+  for (;;) {
+    if (offset + 4 > flac.length) return true; // truncated: can't tell
+    const header = flac[offset];
+    offset += 4 + flac.readUIntBE(offset + 1, 3);
+    if (header & 0x80) return offset < flac.length; // last metadata block: frames follow, if any
+  }
+}
+
 function runFfmpeg(input: string, start: number, duration: number, signal: AbortSignal): Promise<Buffer> {
   const args = [
     "-nostdin",

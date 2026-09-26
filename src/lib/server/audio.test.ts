@@ -15,7 +15,7 @@ vi.mock("@/lib/server/guard", async (importOriginal) => ({
   isPublicAddress: (address: string) => guard.allow(address),
 }));
 
-const { extractWindow, ffmpegPath, resolveAudioUrl } = await import("@/lib/server/audio");
+const { extractWindow, ffmpegPath, hasAudioFrames, resolveAudioUrl } = await import("@/lib/server/audio");
 const { AppError } = await import("@/lib/server/errors");
 
 const FIXTURE_SECONDS = 20;
@@ -145,6 +145,19 @@ describe("extractWindow", () => {
     const controller = new AbortController();
     controller.abort();
     await expect(extractWindow(`${base}/episode.mp3`, 0, 5, controller.signal)).rejects.toThrow(/abort/i);
+  });
+});
+
+describe("hasAudioFrames", () => {
+  it("tells real audio from the header-only FLAC ffmpeg writes past the end", async () => {
+    expect(hasAudioFrames(await extractWindow(`${base}/episode.mp3`, 5, 5))).toBe(true);
+    expect(hasAudioFrames(await extractWindow(`${base}/episode.mp3`, 15, 10))).toBe(true); // runs off the end
+    expect(hasAudioFrames(await extractWindow(`${base}/episode.mp3`, 60, 5))).toBe(false);
+  });
+
+  it("assumes audio when it can't tell", () => {
+    expect(hasAudioFrames(Buffer.from("not flac at all"))).toBe(true);
+    expect(hasAudioFrames(Buffer.from("fLaC\x00\x00"))).toBe(true); // truncated block header
   });
 });
 

@@ -8,7 +8,10 @@ vi.stubEnv("DATABASE_URL", `file:${path.join(dir, "test.db")}`);
 
 // The paid steps are stubbed; storage, caching and usage are real.
 const steps = vi.hoisted(() => ({ extractWindow: vi.fn(), transcribe: vi.fn(), detectAds: vi.fn() }));
-vi.mock("@/lib/server/audio", () => ({ extractWindow: steps.extractWindow }));
+vi.mock("@/lib/server/audio", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/server/audio")>()),
+  extractWindow: steps.extractWindow,
+}));
 vi.mock("@/lib/server/transcribe", () => ({ transcribe: steps.transcribe }));
 vi.mock("@/lib/server/llm/detect", () => ({ detectAds: steps.detectAds }));
 
@@ -187,5 +190,26 @@ describe("shared work", () => {
     expect(second.segments).toEqual(segmentsAt(0));
     expect(steps.extractWindow).toHaveBeenCalledTimes(2);
     expect((await first).name).toBe("AbortError");
+  });
+});
+
+/** What ffmpeg writes past the end of a file: a FLAC stream with metadata and no audio frames. */
+const HEADER_ONLY_FLAC = Buffer.concat([Buffer.from("fLaC"), Buffer.from([0x80, 0, 0, 34]), Buffer.alloc(34)]);
+
+describe("the end of the audio", () => {
+  it("answers an empty, final window without paying for transcription or storing anything", async () => {
+    const url = "https://cdn.example.com/short.mp3";
+    await analyzeWindow(url, 0, "en", {}, "listener-end");
+    vi.clearAllMocks();
+    steps.extractWindow.mockResolvedValue(HEADER_ONLY_FLAC);
+
+    const past = await analyzeWindow(url, 300, "en", {}, "listener-end");
+    expect(past).toMatchObject({ window: 300, segments: [], end: true });
+    // Ads found so far in the episode still come back.
+    expect(past.ads).toHaveLength(1);
+    expect(steps.transcribe).not.toHaveBeenCalled();
+    expect(steps.detectAds).not.toHaveBeenCalled();
+    expect((await cachedAnalysis(url)).windows).toEqual([0]);
+    expect((await usageForMonth(currentMonth())).get("listener-end")?.audioSeconds).toBe(300);
   });
 });

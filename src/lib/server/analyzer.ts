@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
 import type { AdRange, AnalyzeResponse, CachedAnalysis, EpisodeContext, TranscriptSegment } from "@/lib/types";
-import { extractWindow } from "@/lib/server/audio";
+import { extractWindow, hasAudioFrames } from "@/lib/server/audio";
 import { detectConfig, transcribeConfig, type ApiConfig } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
 import { AppError } from "@/lib/server/errors";
@@ -140,9 +140,9 @@ async function transcribeWindow(
   language: string | undefined,
   userId: string,
   signal?: AbortSignal,
-): Promise<TranscriptSegment[]> {
+): Promise<{ segments: TranscriptSegment[]; end: boolean }> {
   const cached = await storedSegments(urlKey, start);
-  if (cached) return cached;
+  if (cached) return { segments: cached, end: false };
 
   const config = transcribeConfig();
   if (!config) throw new AppError("config", "Transcription isn't configured on this server (TRANSCRIBE_API_KEY)");
@@ -151,6 +151,8 @@ async function transcribeWindow(
     `t:${urlKey}:${start}`,
     async (taskSignal) => {
       const audio = await extractWindow(url, start, WINDOW_SECONDS, taskSignal);
+      // Past the end of the file: nothing to pay for, and nothing worth storing.
+      if (!hasAudioFrames(audio)) return { segments: [], end: true };
       const { segments, audioSeconds } = await transcribe(audio, start, WINDOW_SECONDS, language, config, taskSignal);
       const db = await getDb();
       // One transaction: the transcript is only kept with the usage it cost.
@@ -164,7 +166,7 @@ async function transcribeWindow(
         ],
         "write",
       );
-      return segments;
+      return { segments, end: false };
     },
     signal,
   );
@@ -230,7 +232,11 @@ export async function analyzeWindow(
   const detector = detectorKey(config);
   const cached = Boolean(await storedVerdict(urlKey, window, detector));
 
-  const segments = await transcribeWindow(url, urlKey, window, language, userId, signal);
+  const { segments, end } = await transcribeWindow(url, urlKey, window, language, userId, signal);
+  if (end) {
+    const { ads } = await episodeAnalysis(urlKey, detector);
+    return { window, segments: [], ads, cached: false, end: true };
+  }
   await classifyWindow(urlKey, window, segments, episode, config, userId, signal);
 
   const { ads } = await episodeAnalysis(urlKey, detector);
