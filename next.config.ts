@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/lib/securityHeaders";
 
 const nextConfig: NextConfig = {
   // The floating dev badge sits on top of the player bar's controls.
@@ -12,6 +13,9 @@ const nextConfig: NextConfig = {
   // Ship the static ffmpeg binary with the function that runs it (on Vercel).
   outputFileTracingIncludes: {
     "/api/analyze": ["./node_modules/@ffmpeg-installer/linux-x64/**"],
+  },
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders({ dev: process.env.NODE_ENV === "development" }) }];
   },
 };
 
