@@ -49,3 +49,27 @@ describe("requireUser / requireAdmin", () => {
     expect(await requireAdmin()).toMatchObject({ role: "admin" });
   });
 });
+
+describe("fresh checks", () => {
+  it("skip the session cookie cache only when asked", async () => {
+    mocks.getSession.mockResolvedValue(sessionFor({ role: "user", approved: true }));
+    await currentUser();
+    expect(mocks.getSession.mock.calls[0][0].query).toBeUndefined();
+    await currentUser({ fresh: true });
+    expect(mocks.getSession.mock.calls[1][0].query).toEqual({ disableCookieCache: true });
+  });
+
+  it("are what admin gating uses", async () => {
+    mocks.getSession.mockResolvedValue(sessionFor({ role: "admin" }));
+    await requireAdmin();
+    expect(mocks.getSession.mock.calls.at(-1)?.[0].query).toEqual({ disableCookieCache: true });
+  });
+
+  it("re-check a cached 'waiting for approval', so a new approval never bounces between pages", async () => {
+    mocks.getSession
+      .mockResolvedValueOnce(sessionFor({ role: "user", approved: false })) // from the cookie cache
+      .mockResolvedValueOnce(sessionFor({ role: "user", approved: true })); // from the database
+    expect(await currentUser()).toMatchObject({ approved: true });
+    expect(mocks.getSession.mock.calls.at(-1)?.[0].query).toEqual({ disableCookieCache: true });
+  });
+});

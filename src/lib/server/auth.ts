@@ -56,6 +56,10 @@ function buildOptions(db: Client) {
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // refresh daily while in use
+      // Most requests read the session from a signed cookie instead of the
+      // database. Kept short: a disabled account keeps access for up to this
+      // long, and checks where that matters (approval, admin) skip the cache.
+      cookieCache: { enabled: true, maxAge: 60 },
     },
     user: {
       additionalFields: {
