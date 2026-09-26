@@ -2,12 +2,12 @@ import { LibsqlDialect, type LibsqlDialectConfig } from "@libsql/kysely-libsql";
 import type { Client } from "@libsql/client";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
-import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { adminEmail } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
 import { log } from "@/lib/server/log";
+import { ensureAuthSchema } from "@/lib/server/migrations";
 
 /** Social sign-in is offered only for providers with credentials configured. */
 const socialProviders = {
@@ -31,7 +31,7 @@ async function adminExists(db: Client): Promise<boolean> {
  * account with PODBLOCK_ADMIN_EMAIL becomes the admin. Until it exists, no
  * one else can sign up, so nobody can claim that email first.
  */
-function buildOptions(db: Client) {
+export function getAuthOptions(db: Client) {
   return {
     appName: "Podblock",
     // Better Auth's own messages, in the same structured log.
@@ -94,7 +94,7 @@ function buildOptions(db: Client) {
   } satisfies BetterAuthOptions;
 }
 
-const createAuth = (options: ReturnType<typeof buildOptions>) => betterAuth(options);
+const createAuth = (options: ReturnType<typeof getAuthOptions>) => betterAuth(options);
 export type Auth = ReturnType<typeof createAuth>;
 
 /** If the admin's account already exists (e.g. the email was set later), make sure it's the admin. */
@@ -110,16 +110,16 @@ async function promoteAdmin(db: Client) {
 /**
  * The auth instance, created after its tables exist: a fresh database needs
  * no separate migration step, and Better Auth's startup schema check (which
- * runs as soon as an instance is created) sees the finished schema.
+ * runs as soon as an instance is created) sees the finished schema. An
+ * up-to-date database costs one read here.
  */
 const globalForAuth = globalThis as unknown as { __podblockAuth?: Promise<Auth> };
 export function getAuth(): Promise<Auth> {
   if (!globalForAuth.__podblockAuth) {
     globalForAuth.__podblockAuth = (async () => {
       const db = await getDb();
-      const options = buildOptions(db);
-      const { runMigrations } = await getMigrations(options);
-      await runMigrations();
+      const options = getAuthOptions(db);
+      await ensureAuthSchema(db, options);
       await promoteAdmin(db);
       return createAuth(options);
     })().catch((err) => {

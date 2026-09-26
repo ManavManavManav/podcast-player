@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createClient, type Client } from "@libsql/client";
+import { ensureAppSchema } from "@/lib/server/migrations";
 
 /**
  * The app's database (accounts, sessions, analysis cache, usage), via libSQL:
@@ -19,48 +20,18 @@ export function databaseConfig(): { url: string; authToken?: string } {
   return { url: `file:${path.join(DATA_DIR, "podblock.db")}` };
 }
 
-const SCHEMA = [
-  // One transcribed window of an episode (episode time, seconds).
-  `CREATE TABLE IF NOT EXISTS analysis_window (
-    url_key TEXT NOT NULL,
-    start INTEGER NOT NULL,
-    url TEXT NOT NULL,
-    segments TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    PRIMARY KEY (url_key, start)
-  )`,
-  // A detector's ads for one window. Keyed by model and prompt version, so
-  // changing either redoes the work instead of reusing stale verdicts.
-  `CREATE TABLE IF NOT EXISTS analysis_verdict (
-    url_key TEXT NOT NULL,
-    start INTEGER NOT NULL,
-    detector TEXT NOT NULL,
-    ads TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    PRIMARY KEY (url_key, start, detector)
-  )`,
-  // Paid API work, per user per month, for the admin page.
-  `CREATE TABLE IF NOT EXISTS usage (
-    user_id TEXT NOT NULL,
-    month TEXT NOT NULL,
-    audio_seconds REAL NOT NULL DEFAULT 0,
-    detect_calls INTEGER NOT NULL DEFAULT 0,
-    input_tokens INTEGER NOT NULL DEFAULT 0,
-    output_tokens INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (user_id, month)
-  )`,
-];
 
 /**
  * One client per server process, surviving dev-mode module reloads. Created
- * on first use rather than on import, so `next build` never connects.
+ * on first use rather than on import, so `next build` never connects. The
+ * app's tables are brought up to date first (a single read when they are).
  */
 const globalForDb = globalThis as unknown as { __podblockDb?: Promise<Client> };
 export function getDb(): Promise<Client> {
   if (!globalForDb.__podblockDb) {
     globalForDb.__podblockDb = (async () => {
       const client = createClient(databaseConfig());
-      await client.batch(SCHEMA, "write");
+      await ensureAppSchema(client);
       return client;
     })().catch((err) => {
       globalForDb.__podblockDb = undefined;
