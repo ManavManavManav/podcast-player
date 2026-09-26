@@ -187,13 +187,13 @@ export async function resolveAudioUrl(url: string): Promise<string> {
 
   let final = url;
   try {
-    const res = await fetch(url, {
+    // Every hop is checked, so a redirect can't make the server request an internal address.
+    const { response, url: answered } = await fetchPublic(url, {
       headers: { Range: "bytes=0-0", "User-Agent": "Podblock/1.0" },
-      redirect: "follow",
       signal: AbortSignal.timeout(10_000),
     });
-    await res.body?.cancel();
-    if (res.ok && isHttpUrl(res.url)) final = res.url;
+    await response.body?.cancel();
+    if (response.ok && isHttpUrl(answered)) final = answered;
   } catch {
     // Use the original URL.
   }

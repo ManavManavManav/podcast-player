@@ -8,10 +8,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // The fixture server runs on 127.0.0.1, which the real guard (rightly)
 // refuses. Every address counts as public here; the guard has its own tests.
+const guard = vi.hoisted(() => ({ allow: ((_address: string) => true) as (address: string) => boolean }));
 vi.mock("@/lib/server/guard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/guard")>()),
   isPublicUrl: async () => true,
-  isPublicAddress: () => true,
+  isPublicAddress: (address: string) => guard.allow(address),
 }));
 
 const { extractWindow, ffmpegPath, resolveAudioUrl } = await import("@/lib/server/audio");
@@ -86,6 +87,7 @@ afterAll(() => {
 
 beforeEach(() => {
   requests = [];
+  guard.allow = () => true;
 });
 
 describe("extractWindow", () => {
@@ -149,6 +151,12 @@ describe("resolveAudioUrl", () => {
     const before = requests.length;
     expect(await resolveAudioUrl(`${base}/redirect?c=1`)).toBe(`${base}/episode.mp3`);
     expect(requests.length).toBe(before);
+  });
+
+  it("never requests a host that isn't public", async () => {
+    guard.allow = () => false;
+    expect(await resolveAudioUrl(`${base}/redirect?d=1`)).toBe(`${base}/redirect?d=1`);
+    expect(requests).toEqual([]);
   });
 
   it("refuses non-http(s) URLs", async () => {
