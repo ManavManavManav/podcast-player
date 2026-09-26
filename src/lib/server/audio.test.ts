@@ -24,6 +24,9 @@ let fixture: Buffer;
 let server: http.Server;
 let base: string;
 let requests: Array<{ url: string; range?: string }> = [];
+let bytesServed = 0;
+/** A longer episode, to show seeking doesn't download everything before the window. */
+let longFixture: Buffer;
 
 /** Serves the fixture with range support, plus redirects. */
 function serve(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -37,24 +40,28 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     res.writeHead(302, { location: "/episode.mp3" }).end();
     return;
   }
-  if (req.url !== "/episode.mp3") {
+  const file = req.url === "/long.mp3" ? longFixture : req.url === "/episode.mp3" ? fixture : null;
+  if (!file) {
     res.writeHead(404).end();
     return;
   }
   const range = req.headers.range?.match(/bytes=(\d+)-(\d*)/);
   if (range) {
     const start = Number(range[1]);
-    const end = range[2] ? Math.min(Number(range[2]), fixture.length - 1) : fixture.length - 1;
+    const end = range[2] ? Math.min(Number(range[2]), file.length - 1) : file.length - 1;
     res.writeHead(206, {
       "content-type": "audio/mpeg",
       "accept-ranges": "bytes",
       "content-length": end - start + 1,
-      "content-range": `bytes ${start}-${end}/${fixture.length}`,
+      "content-range": `bytes ${start}-${end}/${file.length}`,
     });
-    res.end(fixture.subarray(start, end + 1));
+    const body = file.subarray(start, end + 1);
+    res.write(body, () => (bytesServed += body.length));
+    res.end();
   } else {
-    res.writeHead(200, { "content-type": "audio/mpeg", "accept-ranges": "bytes", "content-length": fixture.length });
-    res.end(fixture);
+    res.writeHead(200, { "content-type": "audio/mpeg", "accept-ranges": "bytes", "content-length": file.length });
+    res.write(file, () => (bytesServed += file.length));
+    res.end();
   }
 }
 
@@ -75,6 +82,12 @@ beforeAll(async () => {
     "-ac", "1", "-ar", "22050", "-c:a", "libmp3lame", "-b:a", "64k", file,
   ]);
   fixture = fs.readFileSync(file);
+  const long = path.join(dir, "long.mp3");
+  execFileSync(ffmpegPath, [
+    "-v", "error", "-f", "lavfi", "-i", "sine=frequency=330:duration=120",
+    "-ac", "1", "-ar", "22050", "-c:a", "libmp3lame", "-b:a", "64k", long,
+  ]);
+  longFixture = fs.readFileSync(long);
   server = http.createServer(serve);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -88,6 +101,7 @@ afterAll(() => {
 
 beforeEach(() => {
   requests = [];
+  bytesServed = 0;
   guard.allow = () => true;
 });
 
@@ -101,6 +115,34 @@ describe("extractWindow", () => {
   it("stops at the end of the file", async () => {
     const flac = await extractWindow(`${base}/episode.mp3`, 15, 10);
     expect(flacSeconds(flac)).toBeCloseTo(5, 0);
+  });
+
+  it("extracts a window late in a longer file", async () => {
+    const flac = await extractWindow(`${base}/long.mp3`, 100, 5);
+    expect(flacSeconds(flac)).toBeCloseTo(5, 1);
+  });
+
+  // Known gap (PRODUCTION_PLAN.md #21): ffmpeg's MP3 demuxer seeks by reading
+  // from the start unless fast seeking is on, so every window downloads the
+  // whole episode up to it. Fast seeking trades that for estimated offsets.
+  it.fails("seeks with range requests instead of downloading everything before the window", async () => {
+    await extractWindow(`${base}/long.mp3`, 100, 5);
+    expect(requests.some((r) => r.range && r.range !== "bytes=0-")).toBe(true);
+    // The window starts 100 s into 120 s of audio.
+    expect(bytesServed).toBeLessThan(longFixture.length * 0.5);
+  });
+
+  it("gives up on a host that stops sending", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const pending = extractWindow(`${base}/stall.mp3`, 0, 5).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(90_000);
+      const err = await pending;
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.message).toMatch(/Timed out/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("follows redirects", async () => {
