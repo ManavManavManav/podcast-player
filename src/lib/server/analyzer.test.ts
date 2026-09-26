@@ -299,3 +299,42 @@ describe("logging", () => {
     expect(events()).toEqual([expect.objectContaining({ event: "analysis.end_of_audio", window: 600 })]);
   });
 });
+
+describe("reading what's stored", () => {
+  it("snaps an ad's end to speech in the next window", async () => {
+    const url = "https://cdn.example.com/snap-next.mp3";
+    steps.detectAds
+      .mockResolvedValueOnce({ ads: [{ start: 250, end: 299, confidence: 0.9, reason: "Ad: Acme" }], inputTokens: 1, outputTokens: 1 })
+      .mockResolvedValueOnce({ ads: [], inputTokens: 1, outputTokens: 1 });
+    steps.transcribe.mockImplementation(async (_a: Buffer, start: number) => ({
+      segments: start === 0 ? [{ start: 250, end: 299, text: "Acme" }] : [{ start: 301, end: 320, text: "Back to the show" }],
+      audioSeconds: 300,
+    }));
+    await analyzeWindow(url, 0, "en", {}, "u-snap");
+    const second = await analyzeWindow(url, 300, "en", {}, "u-snap");
+    expect(second.ads).toEqual([{ start: 250, end: 301, confidence: 0.9, reason: "Ad: Acme" }]);
+  });
+
+  it("reads only the transcripts it needs, however long the episode", async () => {
+    const url = "https://cdn.example.com/long-episode.mp3";
+    // 36 windows (3 hours), one ad in window 1500.
+    steps.detectAds.mockImplementation(async (window: Array<{ start: number }>) => ({
+      ads: window[0].start === 1510 ? [{ start: 1510, end: 1540, confidence: 0.9, reason: "Ad: Acme" }] : [],
+      inputTokens: 1,
+      outputTokens: 1,
+    }));
+    for (let w = 0; w < 36 * 300; w += 300) await analyzeWindow(url, w, "en", {}, "u-long");
+
+    const db = await getDb();
+    const execute = vi.spyOn(db, "execute");
+    const cached = await analyzeWindow(url, 3000, "en", {}, "u-long");
+    expect(cached.cached).toBe(true);
+    expect(cached.ads).toEqual([{ start: 1510, end: 1542, confidence: 0.9, reason: "Ad: Acme" }]);
+
+    const results = await Promise.all(execute.mock.results.map((r) => r.value));
+    const transcriptsRead = results.flatMap((r) => r.rows).filter((row) => "segments" in row).length;
+    expect(transcriptsRead).toBeLessThanOrEqual(3);
+    expect(execute.mock.calls.length).toBeLessThanOrEqual(3);
+    execute.mockRestore();
+  });
+});

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { WINDOW_SECONDS } from "@/lib/analysis";
+import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
 import type { AdRange, AnalyzeResponse, CachedAnalysis, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import { extractWindow, hasAudioFrames } from "@/lib/server/audio";
@@ -132,6 +132,44 @@ async function episodeAnalysis(urlKey: string, detector: string) {
   return { windows, segments, ads };
 }
 
+/** One window's transcript and this detector's verdict, in one read. */
+async function storedWindow(urlKey: string, start: number, detector: string) {
+  const db = await getDb();
+  const { rows } = await db.execute({
+    sql: `SELECT w.segments, v.ads FROM analysis_window w
+          LEFT JOIN analysis_verdict v ON v.url_key = w.url_key AND v.start = w.start AND v.detector = ?
+          WHERE w.url_key = ? AND w.start = ?`,
+    args: [detector, urlKey, start],
+  });
+  const row = rows[0];
+  return {
+    segments: row ? (JSON.parse(String(row.segments)) as TranscriptSegment[]) : null,
+    ads: row?.ads != null ? (JSON.parse(String(row.ads)) as AdRange[]) : null,
+  };
+}
+
+/**
+ * The episode's ads, merged and snapped to speech, reading only the
+ * transcripts snapping needs (the windows where an ad ends, and the next),
+ * not the whole episode's.
+ */
+async function episodeAds(urlKey: string, detector: string): Promise<AdRange[]> {
+  const db = await getDb();
+  const { rows } = await db.execute({
+    sql: "SELECT ads FROM analysis_verdict WHERE url_key = ? AND detector = ?",
+    args: [urlKey, detector],
+  });
+  const merged = mergeRanges(rows.flatMap((row) => JSON.parse(String(row.ads)) as AdRange[]), 2);
+  if (merged.length === 0) return merged;
+  const windows = [...new Set(merged.flatMap((ad) => [windowStartFor(ad.end), windowStartFor(ad.end) + WINDOW_SECONDS]))];
+  const { rows: transcripts } = await db.execute({
+    sql: `SELECT segments FROM analysis_window WHERE url_key = ? AND start IN (${windows.map(() => "?").join(", ")})`,
+    args: [urlKey, ...windows],
+  });
+  const segments = transcripts.flatMap((row) => JSON.parse(String(row.segments)) as TranscriptSegment[]);
+  return snapToSpeech(merged, segments);
+}
+
 // --- The two steps -----------------------------------------------------------------
 
 async function transcribeWindow(
@@ -142,15 +180,15 @@ async function transcribeWindow(
   userId: string,
   signal?: AbortSignal,
 ): Promise<{ segments: TranscriptSegment[]; end: boolean }> {
-  const cached = await storedSegments(urlKey, start);
-  if (cached) return { segments: cached, end: false };
-
   const config = transcribeConfig();
   if (!config) throw new AppError("config", "Transcription isn't configured on this server (TRANSCRIBE_API_KEY)");
 
   return shared(
     `t:${urlKey}:${start}`,
     async (taskSignal) => {
+      // Another request may have finished this window since the caller looked.
+      const done = await storedSegments(urlKey, start);
+      if (done) return { segments: done, end: false };
       const began = performance.now();
       const audio = await extractWindow(url, start, WINDOW_SECONDS, taskSignal);
       const extracted = performance.now();
@@ -199,11 +237,11 @@ async function classifyWindow(
   signal?: AbortSignal,
 ): Promise<void> {
   const detector = detectorKey(config);
-  if (await storedVerdict(urlKey, start, detector)) return;
-
   await shared(
     `d:${urlKey}:${start}:${detector}`,
     async (taskSignal) => {
+      // Another request may have finished this window since the caller looked.
+      if (await storedVerdict(urlKey, start, detector)) return;
       // The end of the previous window, if it's been transcribed, so an ad
       // running across the boundary is recognized.
       const context = (await storedSegments(urlKey, start - WINDOW_SECONDS)) ?? [];
@@ -259,17 +297,19 @@ export async function analyzeWindow(
 
   const urlKey = keyFor(url);
   const detector = detectorKey(config);
-  const cached = Boolean(await storedVerdict(urlKey, window, detector));
+  const stored = await storedWindow(urlKey, window, detector);
+  if (stored.segments && stored.ads) {
+    return { window, segments: stored.segments, ads: await episodeAds(urlKey, detector), cached: true };
+  }
 
-  const { segments, end } = await transcribeWindow(url, urlKey, window, language, userId, signal);
-  if (end) {
-    const { ads } = await episodeAnalysis(urlKey, detector);
-    return { window, segments: [], ads, cached: false, end: true };
+  let segments = stored.segments;
+  if (!segments) {
+    const transcribed = await transcribeWindow(url, urlKey, window, language, userId, signal);
+    if (transcribed.end) return { window, segments: [], ads: await episodeAds(urlKey, detector), cached: false, end: true };
+    segments = transcribed.segments;
   }
   await classifyWindow(urlKey, window, segments, episode, config, userId, signal);
-
-  const { ads } = await episodeAnalysis(urlKey, detector);
-  return { window, segments, ads, cached };
+  return { window, segments, ads: await episodeAds(urlKey, detector), cached: false };
 }
 
 /** Everything already analyzed for an episode, without doing any new work. */
