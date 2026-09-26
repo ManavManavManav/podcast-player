@@ -3,7 +3,7 @@ import { isIP } from "node:net";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * The analysis routes make this machine fetch URLs and run ffmpeg/Whisper, so
+ * The analysis routes make the server fetch URLs and spend API credit, so
  * they must only answer the app itself — not any website the user happens to
  * have open, which could otherwise post to http://localhost:3000.
  *

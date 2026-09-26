@@ -13,7 +13,9 @@
     "doctor": "node scripts/doctor.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@libsql/client": "^0.18.0",
+    "@libsql/kysely-libsql": "^0.4.1",
     "better-auth": "^1.7.5",
     "lucide-react": "^1.47.0",
     "next": "^16.3.6",

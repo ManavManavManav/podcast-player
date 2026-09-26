@@ -45,3 +45,6 @@ next-env.d.ts
 /.cache/
 
 /.data/
+
+# Python virtualenv for Whisper
+.venv/

@@ -6,13 +6,13 @@ import type { AnalyzeResponse, EpisodeContext } from "@/lib/types";
 import { useAnalysis } from "@/store/analysis";
 import { usePlayback, usePlayer } from "@/store/player";
 
-/** Requests in flight at once. Two lets audio fetching overlap transcription. */
+/** Requests in flight at once: the playhead's window and the next. */
 const CONCURRENCY = 2;
 /** After this many failures in a row, stop and surface the error. */
 const MAX_CONSECUTIVE_ERRORS = 3;
 const RETRY_DELAY_MS = 8_000;
 
-/** What's playing, so detectors can tell the show's own plugs and topic from ads. */
+/** What's playing, so the detector can tell the show's own plugs and topic from ads. */
 function currentEpisodeContext(): EpisodeContext {
   const episode = usePlayer.getState().episode;
   return {
@@ -123,7 +123,7 @@ export function useAdScanner(enabled: boolean) {
           release();
           if (useAnalysis.getState().url !== url) return;
           failures.current = 0;
-          useAnalysis.getState().addWindow(w, result.segments, result.ads, result.detector, result.detectorError);
+          useAnalysis.getState().addWindow(w, result.segments, result.ads);
         })
         .catch((err: Error) => {
           release();

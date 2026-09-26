@@ -4,7 +4,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import os from "node:os";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 const results = [];
@@ -22,26 +22,7 @@ function run(cmd, args) {
 const [major, minor] = process.versions.node.split(".").map(Number);
 check(major > 20 || (major === 20 && minor >= 9), `Node.js ${process.versions.node}`, "Install Node.js 20.9 or newer.");
 
-// ffmpeg
-const ffmpeg = run("ffmpeg", ["-version"]);
-check(Boolean(ffmpeg), ffmpeg ? ffmpeg.split("\n")[0] : "ffmpeg", "Install ffmpeg: brew install ffmpeg (macOS) or apt install ffmpeg.");
-
-// Python with openai-whisper (same search order as the server)
-const candidates = [process.env.WHISPER_PYTHON];
-const whisperCli = run("which", ["whisper"]);
-if (whisperCli) {
-  const shebang = readFileSync(whisperCli, "utf-8").split("\n", 1)[0];
-  if (shebang.startsWith("#!")) candidates.push(shebang.slice(2).trim().split(" ")[0]);
-}
-candidates.push("python3", "python");
-const python = [...new Set(candidates.filter(Boolean))].find((py) => run(py, ["-c", "import whisper"]) !== null);
-check(
-  Boolean(python),
-  python ? `openai-whisper (${python})` : "openai-whisper",
-  "Install it: pip install -U openai-whisper  (or set WHISPER_PYTHON to a Python that has it).",
-);
-
-// Environment
+// .env.local (Next.js loads it for the server; mirror that here)
 const envFile = path.join(process.cwd(), ".env.local");
 const env = { ...process.env };
 if (existsSync(envFile)) {
@@ -50,22 +31,34 @@ if (existsSync(envFile)) {
     if (match) env[match[1]] ??= match[2].replace(/^["']|["']$/g, "");
   }
 }
+
+// ffmpeg (bundled with the app; FFMPEG_PATH overrides it)
+let ffmpegPath = env.FFMPEG_PATH;
+if (!ffmpegPath) {
+  try {
+    ffmpegPath = createRequire(import.meta.url)("@ffmpeg-installer/ffmpeg").path;
+  } catch {
+    ffmpegPath = null;
+  }
+}
+const ffmpeg = ffmpegPath && run(ffmpegPath, ["-version"]);
+check(Boolean(ffmpeg), ffmpeg ? ffmpeg.split("\n")[0] : "ffmpeg", "Run npm install (it bundles ffmpeg), or set FFMPEG_PATH.");
+
+// Environment
 check(Boolean(env.PODCAST_INDEX_API_KEY), "PODCAST_INDEX_API_KEY", "Get free keys at https://api.podcastindex.org and add them to .env.local.");
 check(
   Boolean(env.PODCAST_INDEX_API_SECRET || env.PODCAST_INDEX_API_SECRET_BASE64),
   "PODCAST_INDEX_API_SECRET",
   "Add PODCAST_INDEX_API_SECRET to .env.local.",
 );
-
 check(
   (env.BETTER_AUTH_SECRET ?? "").length >= 32,
   "BETTER_AUTH_SECRET",
   "Add one to .env.local: BETTER_AUTH_SECRET=$(openssl rand -base64 48)",
 );
-
-// Whisper model (downloaded automatically on first use; just informational)
-const model = env.WHISPER_MODEL || "base";
-const modelCached = existsSync(path.join(os.homedir(), ".cache", "whisper", `${model}.pt`));
+check(Boolean(env.PODBLOCK_ADMIN_EMAIL), "PODBLOCK_ADMIN_EMAIL", "Set it to your email; that account becomes the admin who approves everyone else.");
+check(Boolean(env.TRANSCRIBE_API_KEY), "TRANSCRIBE_API_KEY", "Add a Groq (or other OpenAI-compatible) speech-to-text key.");
+check(Boolean(env.DETECT_API_KEY), "DETECT_API_KEY", "Add a Xiaomi MiMo (or other OpenAI-compatible) API key for ad detection.");
 
 // Report
 console.log("\nPodblock setup check\n");
@@ -73,11 +66,8 @@ for (const r of results) {
   console.log(`  ${r.ok ? "✓" : "✗"} ${r.label}`);
   if (!r.ok) console.log(`      → ${r.fix}`);
 }
-console.log(
-  `\n  Whisper model: ${model}${modelCached ? " (downloaded)" : " (will download on first play)"}`,
-);
-const shared = [env.ZAI_API_KEY && "Z.ai", env.ANTHROPIC_API_KEY && "Anthropic"].filter(Boolean);
-console.log(`  Shared AI keys: ${shared.length ? shared.join(", ") : "none (users add their own in Settings)"}`);
-console.log(`  Sign-ups:      ${env.PODBLOCK_ALLOW_SIGNUPS === "false" ? "closed" : "open"}\n`);
+console.log(`\n  Database:      ${env.DATABASE_URL ? env.DATABASE_URL.replace(/\/\/.*@/, "//…@") : "local file (.data/podblock.db)"}`);
+console.log(`  Transcription: ${env.TRANSCRIBE_MODEL || "whisper-large-v3-turbo"} @ ${env.TRANSCRIBE_BASE_URL || "https://api.groq.com/openai/v1"}`);
+console.log(`  Ad detection:  ${env.DETECT_MODEL || "mimo-v2.6-pro"} @ ${env.DETECT_BASE_URL || "https://api.xiaomimimo.com/v1"}\n`);
 
 process.exit(results.every((r) => r.ok) ? 0 : 1);

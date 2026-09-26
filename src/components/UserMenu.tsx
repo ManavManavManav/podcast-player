@@ -1,12 +1,22 @@
 "use client";
 
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/authClient";
 import { usePlayer } from "@/store/player";
 
-export function UserMenu({ name, email, image }: { name: string; email: string; image: string | null }) {
+export function UserMenu({
+  name,
+  email,
+  image,
+  isAdmin,
+}: {
+  name: string;
+  email: string;
+  image: string | null;
+  isAdmin: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -63,8 +73,18 @@ export function UserMenu({ name, email, image }: { name: string; email: string; 
             onClick={() => setOpen(false)}
             className="hover-fill flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm"
           >
-            <Settings className="size-4 text-muted" /> Settings &amp; API keys
+            <Settings className="size-4 text-muted" /> Settings
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="hover-fill flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm"
+            >
+              <Users className="size-4 text-muted" /> Users
+            </Link>
+          )}
           <button
             role="menuitem"
             onClick={signOut}

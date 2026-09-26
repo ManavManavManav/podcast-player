@@ -48,10 +48,8 @@ export interface AdRange {
   reason: string;
 }
 
-export type DetectorKind = "heuristic" | "glm" | "claude";
-
 /**
- * What the episode is, so detectors can tell the show's own plugs and the
+ * What the episode is, so the detector can tell the show's own plugs and the
  * episode's subject apart from ads. All hints; any may be missing.
  */
 export interface EpisodeContext {
@@ -68,10 +66,7 @@ export interface AnalyzeResponse {
   segments: TranscriptSegment[];
   /** Every ad found in the episode so far, not just in this window. */
   ads: AdRange[];
-  detector: DetectorKind;
   cached: boolean;
-  /** Set when the chosen AI provider failed and on-device detection was used instead. */
-  detectorError?: string;
 }
 
 /** Response of GET /api/analyze: everything already analyzed for an episode. */
@@ -79,30 +74,24 @@ export interface CachedAnalysis {
   windows: number[];
   segments: TranscriptSegment[];
   ads: AdRange[];
-  detector: DetectorKind;
-}
-
-export type KeyStatus =
-  /** The user saved their own key (shown masked). */
-  | { status: "own"; masked: string }
-  /** No key of their own, but the server operator provided one. */
-  | { status: "shared" }
-  /** A stored key that can't be decrypted (the server secret changed). */
-  | { status: "unreadable" }
-  | { status: "none" };
-
-/** Response of GET/PUT /api/settings. Keys are never sent back in full. */
-export interface UserSettings {
-  detector: DetectorKind;
-  glmModel: string;
-  claudeModel: string;
-  keys: { zai: KeyStatus; anthropic: KeyStatus };
 }
 
 export interface HealthResponse {
   ok: boolean;
   podcastIndex: boolean;
-  ffmpeg: boolean;
-  whisper: { ok: boolean; python: string | null; model: string; error?: string };
-  detector: DetectorKind;
+  transcription: boolean;
+  detection: boolean;
+}
+
+/** A row of the admin page's user list. */
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "user";
+  approved: boolean;
+  banned: boolean;
+  createdAt: string;
+  /** This month's paid API usage. */
+  usage: { audioMinutes: number; detectCalls: number; inputTokens: number; outputTokens: number };
 }

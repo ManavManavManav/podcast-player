@@ -6,7 +6,7 @@ import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
  * Part of the verdict cache key: changing the instructions below should bump
  * it, so verdicts from the old instructions are redone rather than reused.
  */
-export const PROMPT_VERSION = 2;
+export const PROMPT_VERSION = 3;
 
 export const SYSTEM_PROMPT = `You find advertisements in podcast transcripts so a player can skip them.
 
@@ -72,8 +72,8 @@ export function formatTranscript(
 
 /**
  * Parses a model's answer into ad ranges clamped to the window. Tolerates
- * code fences or chatter around the JSON; throws if there's no JSON at all so
- * the caller can fall back to the on-device detector.
+ * code fences or chatter around the JSON; throws if there's no JSON at all,
+ * so the window is retried rather than recorded as ad-free.
  */
 export function parseAds(text: string, window: TranscriptSegment[]): AdRange[] {
   const start = text.indexOf("{");

@@ -12,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // The proxy already redirects when there's no session cookie; this also
   // catches expired or revoked sessions.
   if (!user) redirect("/login");
+  if (!user.approved) redirect("/pending");
 
   return (
     <>
@@ -29,10 +30,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <SearchBox />
             </Suspense>
           </div>
-          <UserMenu name={user.name} email={user.email} image={user.image ?? null} />
+          <UserMenu name={user.name} email={user.email} image={user.image ?? null} isAdmin={user.role === "admin"} />
         </div>
       </header>
-      <SetupNotice />
+      <SetupNotice isAdmin={user.role === "admin"} />
       <main id="main" className="mx-auto max-w-6xl px-4 pb-48 pt-8 sm:px-6">
         {children}
       </main>

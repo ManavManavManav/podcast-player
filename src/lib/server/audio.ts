@@ -1,10 +1,17 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { Readable } from "node:stream";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { isPublicUrl } from "@/lib/server/guard";
 
-const EXTRACT_TIMEOUT_MS = 60_000;
+const EXTRACT_TIMEOUT_MS = 90_000;
+/** Far more than a window of 16 kHz mono FLAC needs; stops a runaway stream. */
+const MAX_OUTPUT_BYTES = 24 * 1024 * 1024;
+
+/** FFMPEG_PATH if set, otherwise the static binary bundled with the app (so it runs on Vercel). */
+export const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path;
 
 export function isHttpUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -16,91 +23,160 @@ export function isHttpUrl(value: unknown): value is string {
   }
 }
 
+const MAX_REDIRECTS = 5;
+/** Response headers ffmpeg needs to seek with range requests. */
+const PASSED_HEADERS = ["content-type", "content-length", "content-range", "accept-ranges"];
+
+/** Fetches `url`, following redirects only to public hosts. */
+async function fetchPublic(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<Response> {
+  let current = url;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    if (!(await isPublicUrl(current))) throw new Error("Audio must be on a public host");
+    const res = await fetch(current, { headers, redirect: "manual", signal });
+    const location = res.headers.get("location");
+    if (res.status < 300 || res.status >= 400 || !location) return res;
+    await res.body?.cancel();
+    current = new URL(location, current).toString();
+  }
+  throw new Error("Too many redirects");
+}
+
+/**
+ * Runs `work` with a loopback URL that proxies range requests to `url`.
+ *
+ * ffmpeg does its own seeking, but the static builds that run on Vercel
+ * crash resolving hostnames. So Node does all the networking (DNS, TLS,
+ * redirects, the public-host check) and ffmpeg only talks to 127.0.0.1.
+ */
+async function withLoopbackProxy<T>(url: string, signal: AbortSignal, work: (localUrl: string) => Promise<T>): Promise<T> {
+  const path = `/${randomUUID()}`;
+  const server = http.createServer(async (req, res) => {
+    if (req.url !== path || req.method !== "GET") {
+      res.writeHead(404).end();
+      return;
+    }
+    const upstream = new AbortController();
+    const abort = () => upstream.abort();
+    res.on("close", abort);
+    signal.addEventListener("abort", abort, { once: true });
+    try {
+      const headers: Record<string, string> = { "User-Agent": "Podblock/1.0" };
+      if (req.headers.range) headers.Range = req.headers.range;
+      const remote = await fetchPublic(url, headers, upstream.signal);
+      const passed = Object.fromEntries(
+        PASSED_HEADERS.flatMap((name) => (remote.headers.has(name) ? [[name, remote.headers.get(name)!]] : [])),
+      );
+      res.writeHead(remote.status, passed);
+      if (!remote.body) return void res.end();
+      Readable.fromWeb(remote.body as import("node:stream/web").ReadableStream).on("error", () => res.destroy()).pipe(res);
+    } catch {
+      if (!res.headersSent) res.writeHead(502);
+      res.end();
+    } finally {
+      signal.removeEventListener("abort", abort);
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    const { port } = server.address() as AddressInfo;
+    return await work(`http://127.0.0.1:${port}${path}`);
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+}
+
 /**
  * Pulls `duration` seconds of audio starting at `start` straight from a
- * remote file and writes it as 16 kHz mono WAV (what Whisper consumes).
+ * remote file, as 16 kHz mono FLAC: lossless for speech recognition, and
+ * about half the size of WAV to upload.
  *
  * ffmpeg seeks with HTTP range requests, so only the bytes around the window
- * are downloaded, not the whole episode. Returns the path of the WAV file;
- * the caller is responsible for deleting it.
+ * are downloaded, not the whole episode.
  */
 export async function extractWindow(
   url: string,
   start: number,
   duration: number,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<Buffer> {
   if (!isHttpUrl(url)) throw new Error("Audio URL must be http(s)");
+  const controller = new AbortController();
+  const stop = () => controller.abort();
+  signal?.addEventListener("abort", stop, { once: true });
+  try {
+    return await withLoopbackProxy(url, controller.signal, (localUrl) =>
+      runFfmpeg(localUrl, start, duration, controller.signal),
+    );
+  } finally {
+    signal?.removeEventListener("abort", stop);
+    controller.abort();
+  }
+}
 
-  const dir = path.join(os.tmpdir(), "podblock");
-  await fs.mkdir(dir, { recursive: true });
-  const output = path.join(dir, `${randomUUID()}.wav`);
-
+function runFfmpeg(input: string, start: number, duration: number, signal: AbortSignal): Promise<Buffer> {
   const args = [
     "-nostdin",
     "-hide_banner",
     "-loglevel", "error",
-    // Only allow network protocols, so a crafted "URL" can't read local files.
-    "-protocol_whitelist", "http,https,tcp,tls,crypto",
-    "-user_agent", "Podblock/1.0",
+    // Only plain HTTP to the loopback proxy, so a crafted input can't read local files.
+    "-protocol_whitelist", "http,tcp",
     "-reconnect", "1",
     "-reconnect_delay_max", "4",
     "-rw_timeout", "20000000",
     "-ss", String(start),
     "-t", String(duration),
-    "-i", url,
+    "-i", input,
     "-vn",
     "-ac", "1",
     "-ar", "16000",
-    "-f", "wav",
-    "-y", output,
+    // 16-bit is plenty for speech; the encoder would otherwise pick 24-bit.
+    "-sample_fmt", "s16",
+    "-c:a", "flac",
+    "-f", "flac",
+    "pipe:1",
   ];
 
-  await new Promise<void>((resolve, reject) => {
-    const ffmpeg = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+  return new Promise<Buffer>((resolve, reject) => {
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const chunks: Buffer[] = [];
+    let size = 0;
     let stderr = "";
     let settled = false;
 
-    const finish = (err?: Error) => {
+    const finish = (err: Error | null, output?: Buffer) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
-      if (err) reject(err);
-      else resolve();
+      if (err) {
+        ffmpeg.kill("SIGKILL");
+        reject(err);
+      } else resolve(output!);
     };
-    const onAbort = () => {
-      ffmpeg.kill("SIGKILL");
-      finish(new DOMException("Aborted", "AbortError"));
-    };
-    const timer = setTimeout(() => {
-      ffmpeg.kill("SIGKILL");
-      finish(new Error("Timed out fetching audio"));
-    }, EXTRACT_TIMEOUT_MS);
+    const onAbort = () => finish(new DOMException("Aborted", "AbortError"));
+    const timer = setTimeout(() => finish(new Error("Timed out fetching audio")), EXTRACT_TIMEOUT_MS);
 
     if (signal?.aborted) return onAbort();
     signal?.addEventListener("abort", onAbort, { once: true });
 
+    ffmpeg.stdout.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > MAX_OUTPUT_BYTES) return finish(new Error("Audio window is unexpectedly large"));
+      chunks.push(chunk);
+    });
     ffmpeg.stderr.on("data", (chunk) => {
       stderr = (stderr + chunk.toString()).slice(-2000);
     });
     ffmpeg.on("error", (err: NodeJS.ErrnoException) => {
-      finish(
-        err.code === "ENOENT"
-          ? new Error("ffmpeg is not installed or not on PATH")
-          : err,
-      );
+      finish(err.code === "ENOENT" ? new Error(`ffmpeg not found at ${ffmpegPath}`) : err);
     });
-    ffmpeg.on("close", (code) => {
-      if (code === 0) finish();
-      else finish(new Error(`ffmpeg exited with code ${code}: ${stderr.trim()}`));
+    ffmpeg.on("close", (code, killedBy) => {
+      if (code !== 0) return finish(new Error(`ffmpeg failed (${killedBy ?? `exit ${code}`}): ${stderr.trim()}`));
+      if (size === 0) return finish(new Error("No audio at this position"));
+      finish(null, Buffer.concat(chunks));
     });
-  }).catch(async (err) => {
-    await fs.rm(output, { force: true });
-    throw err;
   });
-
-  return output;
 }
 
 // --- Pinning a dynamic-ad-insertion variant ---------------------------------------
@@ -139,15 +215,4 @@ export async function resolveAudioUrl(url: string): Promise<string> {
   resolved.set(url, { url: final, at: Date.now() });
   if (resolved.size > 500) resolved.delete(resolved.keys().next().value!);
   return final;
-}
-
-let ffmpegCheck: Promise<boolean> | null = null;
-
-export function ffmpegAvailable(): Promise<boolean> {
-  ffmpegCheck ??= new Promise((resolve) => {
-    const proc = spawn("ffmpeg", ["-version"], { stdio: "ignore" });
-    proc.on("error", () => resolve(false));
-    proc.on("close", (code) => resolve(code === 0));
-  });
-  return ffmpegCheck;
 }

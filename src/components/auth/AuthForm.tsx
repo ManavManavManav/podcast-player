@@ -13,12 +13,10 @@ export function AuthForm({
   mode,
   next,
   socialProviders,
-  signupsAllowed,
 }: {
   mode: Mode;
   next: string;
   socialProviders: Array<keyof typeof PROVIDER_LABELS>;
-  signupsAllowed: boolean;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -47,7 +45,7 @@ export function AuthForm({
     <div className="rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-7">
       <h1 className="text-xl font-semibold tracking-tight">{signup ? "Create your account" : "Sign in"}</h1>
       <p className="mt-1 text-sm text-muted">
-        {signup ? "Your listening history and API keys stay with your account." : "Welcome back."}
+        {signup ? "New accounts are approved by this server's owner before first use." : "Welcome back."}
       </p>
 
       {socialProviders.length > 0 && (
@@ -125,15 +123,13 @@ export function AuthForm({
               Sign in
             </Link>
           </>
-        ) : signupsAllowed ? (
+        ) : (
           <>
             New here?{" "}
             <Link href="/signup" className="font-medium underline underline-offset-4 hover:text-muted">
               Create an account
             </Link>
           </>
-        ) : (
-          "Accounts are created by this server's owner."
         )}
       </p>
     </div>
@@ -164,8 +160,8 @@ function friendlyError(code: string | undefined, message: string | undefined) {
       return "There's already an account with that email. Try signing in.";
     case "PASSWORD_TOO_SHORT":
       return "Use a password of at least 10 characters.";
-    case "EMAIL_PASSWORD_SIGN_UP_DISABLED":
-      return "Sign-ups are closed on this server.";
+    case "BANNED_USER":
+      return "This account has been disabled. Ask the server's owner.";
     default:
       return message || "Something went wrong. Please try again.";
   }

@@ -4,13 +4,15 @@ import { analyzeWindow, cachedAnalysis } from "@/lib/server/analyzer";
 import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 import { requireUser } from "@/lib/server/session";
-import { detectorFor } from "@/lib/server/settings";
 import type { EpisodeContext } from "@/lib/types";
+
+/** Fetching, transcribing and classifying a window takes seconds; allow for slow hosts. */
+export const maxDuration = 120;
 
 /** 12 hours: longer than any real episode, short enough to reject junk. */
 const MAX_START = 12 * 3600;
 
-/** Episode details from the client. Only hints for the detectors, so just bounded. */
+/** Episode details from the client. Only hints for the detector, so just bounded. */
 function episodeContext(input: Record<string, unknown> | URLSearchParams): EpisodeContext {
   const get = (key: string) => (input instanceof URLSearchParams ? input.get(key) : input[key]);
   const text = (value: unknown) => (typeof value === "string" && value.trim() ? value.trim().slice(0, 300) : undefined);
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
   if (!isHttpUrl(url)) {
     return NextResponse.json({ error: "`url` must be an http(s) URL" }, { status: 400 });
   }
-  return NextResponse.json(await cachedAnalysis(url, detectorFor(user.id), episodeContext(req.nextUrl.searchParams)));
+  return NextResponse.json(await cachedAnalysis(url));
 }
 
 /** Analyzes one window of an episode (or returns it from the cache). */
@@ -73,8 +75,8 @@ export async function POST(req: NextRequest) {
       url,
       window,
       whisperLanguage(typeof language === "string" ? language : undefined),
-      detectorFor(user.id),
       episodeContext(body.episode && typeof body.episode === "object" ? (body.episode as Record<string, unknown>) : {}),
+      user.id,
       req.signal,
     );
     return NextResponse.json(result);

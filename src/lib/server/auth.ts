@@ -1,10 +1,12 @@
+import { LibsqlDialect, type LibsqlDialectConfig } from "@libsql/kysely-libsql";
+import type { Client } from "@libsql/client";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { APIError } from "better-auth/api";
 import { getMigrations } from "better-auth/db/migration";
 import { nextCookies } from "better-auth/next-js";
+import { admin } from "better-auth/plugins";
+import { adminEmail } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
-
-/** Set PODBLOCK_ALLOW_SIGNUPS=false once everyone who should have an account has one. */
-export const signupsAllowed = process.env.PODBLOCK_ALLOW_SIGNUPS !== "false";
 
 /** Social sign-in is offered only for providers with credentials configured. */
 const socialProviders = {
@@ -17,47 +19,100 @@ const socialProviders = {
 };
 export const enabledSocialProviders = Object.keys(socialProviders) as Array<"github" | "google">;
 
-/** Built on first use, so importing this module never opens the database. */
-function buildOptions() {
+async function adminExists(db: Client): Promise<boolean> {
+  const { rows } = await db.execute(`SELECT 1 FROM "user" WHERE role = 'admin' LIMIT 1`);
+  return rows.length > 0;
+}
+
+/**
+ * Anyone can sign up, but new accounts wait for the admin's approval before
+ * they can use anything (every listen costs the owner API credit). The
+ * account with PODBLOCK_ADMIN_EMAIL becomes the admin. Until it exists, no
+ * one else can sign up, so nobody can claim that email first.
+ */
+function buildOptions(db: Client) {
   return {
     appName: "Podblock",
-    database: getDb(),
+    database: {
+      // The adapter is typed against an older @libsql/client; the calls it
+      // makes (execute, batch, transactions) are the same in this one.
+      dialect: new LibsqlDialect({ client: db as unknown as Extract<LibsqlDialectConfig, { client: unknown }>["client"] }),
+      type: "sqlite",
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 10,
-      disableSignUp: !signupsAllowed,
     },
     socialProviders,
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // refresh daily while in use
     },
+    user: {
+      additionalFields: {
+        approved: { type: "boolean", defaultValue: false, input: false },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            const owner = adminEmail();
+            if (!owner) {
+              throw new APIError("FORBIDDEN", {
+                message: "Sign-ups aren't open yet: this server has no admin configured.",
+              });
+            }
+            if (user.email.toLowerCase() === owner) {
+              return { data: { ...user, approved: true, role: "admin" } };
+            }
+            if (!(await adminExists(db))) {
+              throw new APIError("FORBIDDEN", { message: "Sign-ups open once the owner has created their account." });
+            }
+            return { data: { ...user, approved: false } };
+          },
+        },
+      },
+    },
     // Also accept sign-ins from other addresses the server is reachable at
     // (e.g. its LAN IP), comma-separated.
     trustedOrigins: process.env.PODBLOCK_TRUSTED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean),
-    plugins: [nextCookies()],
+    plugins: [admin({ defaultRole: "user", adminRoles: ["admin"] }), nextCookies()],
   } satisfies BetterAuthOptions;
 }
 
 const createAuth = (options: ReturnType<typeof buildOptions>) => betterAuth(options);
 export type Auth = ReturnType<typeof createAuth>;
 
+/** If the admin's account already exists (e.g. the email was set later), make sure it's the admin. */
+async function promoteAdmin(db: Client) {
+  const owner = adminEmail();
+  if (!owner) return;
+  await db.execute({
+    sql: `UPDATE "user" SET role = 'admin', approved = 1, banned = 0 WHERE lower(email) = ?`,
+    args: [owner],
+  });
+}
+
 /**
- * The auth instance, created after its tables exist: a fresh checkout needs no
- * separate migration step, and Better Auth's startup schema check (which runs
- * as soon as an instance is created) sees the finished schema.
+ * The auth instance, created after its tables exist: a fresh database needs
+ * no separate migration step, and Better Auth's startup schema check (which
+ * runs as soon as an instance is created) sees the finished schema.
  */
 const globalForAuth = globalThis as unknown as { __podblockAuth?: Promise<Auth> };
 export function getAuth(): Promise<Auth> {
   if (!globalForAuth.__podblockAuth) {
-    const options = buildOptions();
-    globalForAuth.__podblockAuth = getMigrations(options)
-      .then(({ runMigrations }) => runMigrations())
-      .then(() => createAuth(options))
-      .catch((err) => {
-        globalForAuth.__podblockAuth = undefined;
-        throw err;
-      });
+    globalForAuth.__podblockAuth = (async () => {
+      const db = await getDb();
+      const options = buildOptions(db);
+      const { runMigrations } = await getMigrations(options);
+      await runMigrations();
+      await promoteAdmin(db);
+      return createAuth(options);
+    })().catch((err) => {
+      globalForAuth.__podblockAuth = undefined;
+      throw err;
+    });
   }
   return globalForAuth.__podblockAuth;
 }

@@ -38,8 +38,9 @@ describe("formatting", () => {
 describe("analysis helpers", () => {
   it("aligns times to windows", () => {
     expect(windowStartFor(0)).toBe(0);
-    expect(windowStartFor(59.9)).toBe(0);
-    expect(windowStartFor(60)).toBe(60);
+    expect(windowStartFor(299.9)).toBe(0);
+    expect(windowStartFor(300)).toBe(300);
+    expect(windowStartFor(3725)).toBe(3600);
     expect(windowStartFor(-3)).toBe(0);
   });
   it("normalizes feed languages for Whisper", () => {
