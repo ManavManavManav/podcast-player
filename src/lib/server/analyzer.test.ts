@@ -269,3 +269,33 @@ describe("what the README promises", () => {
     expect(second.ads).toEqual([{ start: 280, end: 330, confidence: 0.9, reason: "Ad: Acme" }]);
   });
 });
+
+describe("logging", () => {
+  const events = () =>
+    vi
+      .mocked(console.log)
+      .mock.calls.map(([line]) => JSON.parse(String(line)))
+      .filter((e) => String(e.event).startsWith("analysis."));
+
+  beforeEach(() => {
+    vi.stubEnv("PODBLOCK_LOG_LEVEL", "info");
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  it("records each stage's timing and result", async () => {
+    await analyzeWindow("https://cdn.example.com/logged.mp3", 0, "en", {}, "u-log");
+    const [transcribed, detected] = events();
+    expect(transcribed).toMatchObject({ event: "analysis.transcribed", window: 0, audioSeconds: 300, segments: 2, userId: "u-log" });
+    expect(transcribed.extractMs).toBeTypeOf("number");
+    expect(transcribed.transcribeMs).toBeTypeOf("number");
+    expect(detected).toMatchObject({ event: "analysis.detected", window: 0, ads: 1, inputTokens: 1000, outputTokens: 50 });
+    expect(detected.detectMs).toBeTypeOf("number");
+    expect(detected.detector).toMatch(/:p\d+$/);
+  });
+
+  it("notes the end of the audio", async () => {
+    steps.extractWindow.mockResolvedValue(HEADER_ONLY_FLAC);
+    await analyzeWindow("https://cdn.example.com/logged-end.mp3", 600, "en", {}, "u-log");
+    expect(events()).toEqual([expect.objectContaining({ event: "analysis.end_of_audio", window: 600 })]);
+  });
+});

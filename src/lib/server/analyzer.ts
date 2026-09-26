@@ -6,6 +6,7 @@ import { extractWindow, hasAudioFrames } from "@/lib/server/audio";
 import { detectConfig, transcribeConfig, type ApiConfig } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
 import { AppError } from "@/lib/server/errors";
+import { log } from "@/lib/server/log";
 import { detectAds } from "@/lib/server/llm/detect";
 import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { transcribe } from "@/lib/server/transcribe";
@@ -150,10 +151,16 @@ async function transcribeWindow(
   return shared(
     `t:${urlKey}:${start}`,
     async (taskSignal) => {
+      const began = performance.now();
       const audio = await extractWindow(url, start, WINDOW_SECONDS, taskSignal);
+      const extracted = performance.now();
       // Past the end of the file: nothing to pay for, and nothing worth storing.
-      if (!hasAudioFrames(audio)) return { segments: [], end: true };
+      if (!hasAudioFrames(audio)) {
+        log.info("analysis.end_of_audio", { urlKey, window: start });
+        return { segments: [], end: true };
+      }
       const { segments, audioSeconds } = await transcribe(audio, start, WINDOW_SECONDS, language, config, taskSignal);
+      const transcribed = performance.now();
       const db = await getDb();
       // One transaction: the transcript is only kept with the usage it cost.
       await db.batch(
@@ -166,6 +173,16 @@ async function transcribeWindow(
         ],
         "write",
       );
+      log.info("analysis.transcribed", {
+        urlKey,
+        window: start,
+        userId,
+        extractMs: Math.round(extracted - began),
+        transcribeMs: Math.round(transcribed - extracted),
+        bytes: audio.length,
+        audioSeconds,
+        segments: segments.length,
+      });
       return { segments, end: false };
     },
     signal,
@@ -190,7 +207,9 @@ async function classifyWindow(
       // The end of the previous window, if it's been transcribed, so an ad
       // running across the boundary is recognized.
       const context = (await storedSegments(urlKey, start - WINDOW_SECONDS)) ?? [];
+      const began = performance.now();
       const result = await detectAds(segments, context, episode, config, taskSignal);
+      const detectMs = Math.round(performance.now() - began);
       const db = await getDb();
       await db.batch(
         [
@@ -205,6 +224,16 @@ async function classifyWindow(
         ],
         "write",
       );
+      log.info("analysis.detected", {
+        urlKey,
+        window: start,
+        userId,
+        detector,
+        detectMs,
+        ads: result.ads.length,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      });
     },
     signal,
   );

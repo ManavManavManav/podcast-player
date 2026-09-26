@@ -72,7 +72,7 @@ export async function detectAds(
       }),
       signal: combined,
     });
-    const res = await fetchWithRetry(send, { signal: combined });
+    const res = await fetchWithRetry(send, { signal: combined, label: "detection" });
     const body = (await res.json().catch(() => ({}))) as ChatResponse;
     if (!res.ok) {
       const message = typeof body.error === "string" ? body.error : body.error?.message;

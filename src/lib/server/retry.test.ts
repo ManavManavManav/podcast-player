@@ -98,4 +98,16 @@ describe("fetchWithRetry", () => {
     expect((await pending).name).toBe("AbortError");
     expect(send).toHaveBeenCalledTimes(1);
   });
+
+  it("logs each retry with what went wrong", async () => {
+    vi.stubEnv("PODBLOCK_LOG_LEVEL", "info");
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    const send = vi.fn().mockResolvedValueOnce(status(429, { "retry-after": "2" })).mockResolvedValueOnce(status(200));
+    const pending = fetchWithRetry(send, { label: "transcription" });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await pending;
+    expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({ event: "provider.retry", provider: "transcription", status: 429, waitMs: 2000 });
+    vi.unstubAllEnvs();
+    warn.mockRestore();
+  });
 });

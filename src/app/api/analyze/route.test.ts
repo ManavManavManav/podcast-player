@@ -45,7 +45,11 @@ beforeEach(() => {
   mocks.analyzeWindow.mockResolvedValue({ window: 300, segments: [], ads: [], cached: false });
   mocks.cachedAnalysis.mockResolvedValue({ windows: [0], segments: [], ads: [] });
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.stubEnv("PODBLOCK_LOG_LEVEL", "info");
 });
+
+/** The structured log lines written so far. */
+const logged = () => vi.mocked(console.error).mock.calls.map(([line]) => JSON.parse(String(line)));
 
 describe("POST /api/analyze: requests", () => {
   it("refuses non-JSON and cross-site requests before anything else", async () => {
@@ -105,13 +109,15 @@ describe("POST /api/analyze: requests", () => {
 describe("POST /api/analyze: failures", () => {
   it("doesn't show internal details (ffmpeg output, paths, provider responses) to the listener", async () => {
     mocks.analyzeWindow.mockRejectedValue(new Error("ffmpeg failed (exit 1): /opt/ffmpeg/bin: Invalid data found"));
-    const res = await POST(post({ url: AUDIO, window: 0 }));
+    const res = await POST(post({ url: AUDIO, window: 0 }, { "x-request-id": "req-7" }));
     expect(res.status).toBe(502);
     const body = await res.json();
     expect(body.error).not.toMatch(/ffmpeg|\/opt|Invalid data/);
     expect(body.error).toBeTruthy();
-    // The details still reach the server's log.
-    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).toMatch(/Invalid data found/);
+    // The details still reach the server's log, tagged with the request.
+    const [entry] = logged();
+    expect(entry).toMatchObject({ event: "analysis.failed", code: "internal", requestId: "req-7" });
+    expect(entry.err.message).toMatch(/Invalid data found/);
   });
 
   it("uses the error's public message and kind when there is one", async () => {

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Episode, Podcast } from "@/lib/types";
+import { log } from "@/lib/server/log";
 import { stripHtml } from "@/lib/text";
 
 const DEFAULT_API_BASE = "https://api.podcastindex.org/api/1.0";
@@ -79,9 +80,14 @@ async function request<T>(
     // Still inside the timeout: a body can stall too.
     return (await res.json()) as T;
   } catch (err) {
-    if (err instanceof PodcastIndexError) throw err;
-    if (controller.signal.aborted) throw new PodcastIndexError("Podcast Index didn't answer in time");
-    throw new PodcastIndexError(`Couldn't reach Podcast Index: ${(err as Error).message}`);
+    const failure =
+      err instanceof PodcastIndexError
+        ? err
+        : controller.signal.aborted
+          ? new PodcastIndexError("Podcast Index didn't answer in time")
+          : new PodcastIndexError(`Couldn't reach Podcast Index: ${(err as Error).message}`);
+    log.warn("podcastindex.failed", { endpoint, status: failure.status, message: failure.message });
+    throw failure;
   } finally {
     clearTimeout(timer);
   }

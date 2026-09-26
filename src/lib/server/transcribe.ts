@@ -73,7 +73,7 @@ export async function transcribe(
         body: form,
         signal: combined,
       }),
-    { signal: combined },
+    { signal: combined, label: "transcription" },
   );
   const body = (await res.json().catch(() => ({}))) as VerboseTranscription;
   if (!res.ok) {

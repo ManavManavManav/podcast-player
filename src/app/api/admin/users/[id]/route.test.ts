@@ -37,6 +37,7 @@ beforeEach(() => {
   mocks.requireAdmin.mockResolvedValue(admin);
   mocks.listUsers.mockResolvedValue(users);
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.stubEnv("PODBLOCK_LOG_LEVEL", "info");
 });
 
 describe("POST /api/admin/users/[id]", () => {
@@ -91,5 +92,18 @@ describe("POST /api/admin/users/[id]", () => {
     const { error } = await res.json();
     expect(error).not.toMatch(/SQLITE|\.data/);
     expect(vi.mocked(console.error).mock.calls.flat().map(String).join(" ")).toMatch(/SQLITE_BUSY/);
+  });
+
+  it("keeps an audit trail of what the admin did", async () => {
+    const lines = vi.spyOn(console, "log").mockImplementation(() => {});
+    await call("u2", { action: "approve" });
+    await call("u2", { action: "set-password", password: "a-good-password" });
+    const audit = lines.mock.calls.map(([line]) => JSON.parse(String(line))).filter((e) => e.event === "admin.action");
+    expect(audit).toEqual([
+      expect.objectContaining({ adminId: "admin1", action: "approve", targetId: "u2", targetEmail: "b@example.com", ok: true }),
+      expect.objectContaining({ action: "set-password", ok: true }),
+    ]);
+    // The password itself is never logged.
+    expect(JSON.stringify(lines.mock.calls)).not.toContain("a-good-password");
   });
 });

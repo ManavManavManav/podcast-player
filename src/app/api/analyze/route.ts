@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { WINDOW_SECONDS, whisperLanguage } from "@/lib/analysis";
 import { analyzeWindow, cachedAnalysis } from "@/lib/server/analyzer";
 import { AppError, publicError } from "@/lib/server/errors";
+import { log, withRequestContext } from "@/lib/server/log";
 import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 import { requireUser } from "@/lib/server/session";
@@ -49,7 +50,11 @@ export async function GET(req: NextRequest) {
 }
 
 /** Analyzes one window of an episode (or returns it from the cache). */
-export async function POST(req: NextRequest) {
+export function POST(req: NextRequest) {
+  return withRequestContext(req, () => analyze(req));
+}
+
+async function analyze(req: NextRequest) {
   const refused = rejectCrossSite(req);
   if (refused) return refused;
   const user = await requireUser();
@@ -102,12 +107,12 @@ export async function POST(req: NextRequest) {
     if (error.name === "AbortError" || error.name === "TimeoutError") {
       // Out of time, or shared work was cancelled under us: worth retrying.
       const { status, body } = publicError(new AppError("timeout", `Analysis stopped: ${error.message}`));
-      console.error("[podblock] analysis stopped:", limit.signal.aborted ? "deadline passed" : error.message);
+      log.warn("analysis.stopped", { window, userId: user.id, reason: limit.signal.aborted ? "deadline" : error.message });
       return NextResponse.json(body, { status, headers: { "Retry-After": String(RETRY_AFTER_SECONDS) } });
     }
     // Full details for the log; the listener gets a message meant for them.
-    console.error("[podblock] analysis failed:", error.message, error.cause ?? "");
     const { status, body } = publicError(err);
+    log.error("analysis.failed", { window, userId: user.id, code: body.code, err: error });
     return NextResponse.json(body, { status });
   } finally {
     limit.clear();

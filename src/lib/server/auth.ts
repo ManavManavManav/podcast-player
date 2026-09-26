@@ -7,6 +7,7 @@ import { nextCookies } from "better-auth/next-js";
 import { admin } from "better-auth/plugins";
 import { adminEmail } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
+import { log } from "@/lib/server/log";
 
 /** Social sign-in is offered only for providers with credentials configured. */
 const socialProviders = {
@@ -33,6 +34,10 @@ async function adminExists(db: Client): Promise<boolean> {
 function buildOptions(db: Client) {
   return {
     appName: "Podblock",
+    // Better Auth's own messages, in the same structured log.
+    logger: {
+      log: (level, message, ...args) => log[level]("auth", { message, ...(args.length ? { details: args } : {}) }),
+    },
     database: {
       // The adapter is typed against an older @libsql/client; the calls it
       // makes (execute, batch, transactions) are the same in this one.

@@ -1,3 +1,5 @@
+import { log } from "@/lib/server/log";
+
 /**
  * One retry for transient provider failures: rate limits (429), server
  * errors (5xx) and dropped connections. A second failure is handed back to
@@ -35,7 +37,11 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 
 export async function fetchWithRetry(
   send: () => Promise<Response>,
-  { signal, maxWaitMs = 10_000 }: { signal?: AbortSignal; maxWaitMs?: number } = {},
+  {
+    signal,
+    maxWaitMs = 10_000,
+    label = "provider",
+  }: { signal?: AbortSignal; maxWaitMs?: number; /** Which provider, for the log. */ label?: string } = {},
 ): Promise<Response> {
   let first: Response;
   try {
@@ -43,13 +49,19 @@ export async function fetchWithRetry(
   } catch (err) {
     // Aborts and timeouts are deliberate; only a failed connection is worth another try.
     if (!(err instanceof TypeError)) throw err;
-    await sleep(baseDelay(), signal);
+    const wait = baseDelay();
+    log.warn("provider.retry", { provider: label, error: err.message, waitMs: Math.round(wait) });
+    await sleep(wait, signal);
     return send();
   }
   if (!RETRYABLE.has(first.status)) return first;
 
   const wait = retryAfterMs(first) ?? baseDelay();
-  if (wait > maxWaitMs) return first;
+  if (wait > maxWaitMs) {
+    log.warn("provider.retry_skipped", { provider: label, status: first.status, waitMs: Math.round(wait) });
+    return first;
+  }
+  log.warn("provider.retry", { provider: label, status: first.status, waitMs: Math.round(wait) });
   await first.body?.cancel();
   await sleep(wait, signal);
   return send();
