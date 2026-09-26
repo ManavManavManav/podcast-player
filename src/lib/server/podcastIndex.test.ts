@@ -98,4 +98,23 @@ describe("Podcast Index client", () => {
       expect((await getPodcast(42))?.link).toBe("");
     },
   );
+
+  it("gives up on a request that doesn't answer within 8 s", async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock.mockImplementation(
+        (_url: string, init: RequestInit) =>
+          new Promise((_, reject) => init.signal?.addEventListener("abort", () => reject(init.signal?.reason))),
+      );
+      const pending = searchPodcasts("slow").catch((e) => e);
+      await vi.advanceTimersByTimeAsync(7_900);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(200);
+      const err = await pending;
+      expect(err).toBeInstanceOf(PodcastIndexError);
+      expect(err.message).toMatch(/didn't answer/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

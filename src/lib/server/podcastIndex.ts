@@ -4,6 +4,8 @@ import { stripHtml } from "@/lib/text";
 
 const API_BASE = "https://api.podcastindex.org/api/1.0";
 const USER_AGENT = "Podblock/1.0";
+/** Pages wait on these calls, so a slow API mustn't hang them. */
+const TIMEOUT_MS = 8_000;
 
 export class PodcastIndexError extends Error {
   constructor(
@@ -53,23 +55,34 @@ async function request<T>(
   const query = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)]),
   );
-  const res = await fetch(`${API_BASE}/${endpoint}?${query}`, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "X-Auth-Date": authDate,
-      "X-Auth-Key": key,
-      Authorization: signature,
-    },
-    next: { revalidate },
-  });
-
-  if (!res.ok) {
-    throw new PodcastIndexError(
-      `Podcast Index request failed (${res.status})`,
-      res.status,
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE}/${endpoint}?${query}`, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "X-Auth-Date": authDate,
+        "X-Auth-Key": key,
+        Authorization: signature,
+      },
+      next: { revalidate },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new PodcastIndexError(
+        `Podcast Index request failed (${res.status})`,
+        res.status,
+      );
+    }
+    // Still inside the timeout: a body can stall too.
+    return (await res.json()) as T;
+  } catch (err) {
+    if (err instanceof PodcastIndexError) throw err;
+    if (controller.signal.aborted) throw new PodcastIndexError("Podcast Index didn't answer in time");
+    throw new PodcastIndexError(`Couldn't reach Podcast Index: ${(err as Error).message}`);
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 // --- Raw API shapes (only the fields we use) -------------------------------

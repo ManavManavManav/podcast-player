@@ -8,7 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // The fixture server runs on 127.0.0.1, which the real guard (rightly)
 // refuses. Every address counts as public here; the guard has its own tests.
-const guard = vi.hoisted(() => ({ allow: ((_address: string) => true) as (address: string) => boolean }));
+const guard = vi.hoisted(() => ({ allow: (() => true) as (address: string) => boolean }));
 vi.mock("@/lib/server/guard", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/guard")>()),
   isPublicUrl: async () => true,
