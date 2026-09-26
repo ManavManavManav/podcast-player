@@ -3,7 +3,7 @@ import http from "node:http";
 import https from "node:https";
 import { isIP, type LookupFunction } from "node:net";
 import { Readable } from "node:stream";
-import { isPublicAddress } from "@/lib/server/guard";
+import { isAllowlistedAudioHost, isPublicAddress } from "@/lib/server/guard";
 
 /**
  * Fetching URLs that users hand us (episode audio) without letting them
@@ -62,7 +62,7 @@ function requestOnce(url: URL, options: PublicFetchOptions): Promise<Response> {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return Promise.reject(new Error("Only http(s) URLs can be fetched"));
   }
-  const isAllowed = options.isAllowed ?? isPublicAddress;
+  const isAllowed = options.isAllowed ?? (isAllowlistedAudioHost(url) ? () => true : isPublicAddress);
   const host = url.hostname.replace(/^\[|\]$/g, "");
   // Node skips the lookup for IP literals, so check those here.
   if (isIP(host) && !isAllowed(host)) return Promise.reject(new NonPublicAddressError(host));

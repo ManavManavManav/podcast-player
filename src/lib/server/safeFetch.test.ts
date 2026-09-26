@@ -1,6 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchPublic, type Resolver } from "@/lib/server/safeFetch";
 
 /** A local server standing in for both podcast hosts and internal services. */
@@ -141,5 +141,23 @@ describe("fetchPublic", () => {
     });
     setTimeout(() => controller.abort(), 20);
     await expect(pending).rejects.toThrow(/abort/i);
+  });
+});
+
+describe("fetchPublic with the end-to-end allow-list", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("connects to a listed host:port even though it's private", async () => {
+    vi.stubEnv("PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS", `127.0.0.1:${port}`);
+    const { response } = await fetchPublic(`http://127.0.0.1:${port}/audio`);
+    expect(response.status).toBe(200);
+  });
+
+  it("still refuses a redirect from a listed host to an unlisted private one", async () => {
+    vi.stubEnv("PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS", `127.0.0.1:${port}`);
+    const target = encodeURIComponent(`http://localhost:${port}/audio`);
+    await expect(fetchPublic(`http://127.0.0.1:${port}/redirect/${target}`)).rejects.toThrow(/public/);
   });
 });

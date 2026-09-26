@@ -141,3 +141,23 @@ describe("isPublicAddress", () => {
     expect(isPublicAddress("8.8.8.8")).toBe(true);
   });
 });
+
+describe("audio host allow-list (for end-to-end tests)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("lets exactly the listed host:port pairs through", async () => {
+    vi.stubEnv("PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS", "127.0.0.1:4010, localhost:4011");
+    expect(await isPublicUrl("http://127.0.0.1:4010/episode.mp3")).toBe(true);
+    expect(await isPublicUrl("http://localhost:4011/episode.mp3")).toBe(true);
+    // Same address, other port; other private hosts: still refused.
+    expect(await isPublicUrl("http://127.0.0.1:4012/episode.mp3")).toBe(false);
+    expect(await isPublicUrl("http://127.0.0.1/episode.mp3")).toBe(false);
+    expect(await isPublicUrl("http://169.254.169.254/latest/meta-data")).toBe(false);
+  });
+
+  it("is off unless set", async () => {
+    expect(await isPublicUrl("http://127.0.0.1:4010/episode.mp3")).toBe(false);
+  });
+});

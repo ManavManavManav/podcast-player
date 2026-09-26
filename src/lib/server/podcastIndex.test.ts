@@ -117,4 +117,10 @@ describe("Podcast Index client", () => {
       vi.useRealTimers();
     }
   });
+
+  it("can be pointed at another server (for end-to-end tests)", async () => {
+    vi.stubEnv("PODCAST_INDEX_BASE_URL", "http://127.0.0.1:4010/podcastindex/");
+    await getPodcast(42);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://127.0.0.1:4010/podcastindex/podcasts/byfeedid?id=42");
+  });
 });

@@ -131,9 +131,21 @@ export function isPublicAddress(address: string): boolean {
   return !PRIVATE_V6.check(address, "ipv6");
 }
 
+/**
+ * For end-to-end tests only: exact host:port pairs (comma-separated) that may
+ * serve audio despite being private, such as a fixture server on 127.0.0.1.
+ * Off unless set.
+ */
+export function isAllowlistedAudioHost(url: URL): boolean {
+  const listed = process.env.PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS;
+  if (!listed) return false;
+  return listed.split(",").some((entry) => entry.trim() !== "" && entry.trim() === url.host);
+}
+
 /** True if the URL's host resolves only to public internet addresses. */
 export async function isPublicUrl(url: string): Promise<boolean> {
   try {
+    if (isAllowlistedAudioHost(new URL(url))) return true;
     const { hostname } = new URL(url);
     const host = hostname.replace(/^\[|\]$/g, "");
     if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;

@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import type { Episode, Podcast } from "@/lib/types";
 import { stripHtml } from "@/lib/text";
 
-const API_BASE = "https://api.podcastindex.org/api/1.0";
+const DEFAULT_API_BASE = "https://api.podcastindex.org/api/1.0";
+/** PODCAST_INDEX_BASE_URL points the client at another server (end-to-end tests use a stub). */
+const apiBase = () => (process.env.PODCAST_INDEX_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
 const USER_AGENT = "Podblock/1.0";
 /** Pages wait on these calls, so a slow API mustn't hang them. */
 const TIMEOUT_MS = 8_000;
@@ -58,7 +60,7 @@ async function request<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${API_BASE}/${endpoint}?${query}`, {
+    const res = await fetch(`${apiBase()}/${endpoint}?${query}`, {
       headers: {
         "User-Agent": USER_AGENT,
         "X-Auth-Date": authDate,
