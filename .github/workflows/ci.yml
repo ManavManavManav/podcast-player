@@ -22,7 +22,13 @@ jobs:
       - run: npm ci --no-fund
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
       - run: npm run build
       # Known-vulnerable runtime dependencies fail the build; dev-only advisories don't.
       - run: npm audit --omit=dev --audit-level=high

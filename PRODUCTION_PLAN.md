@@ -186,13 +186,15 @@ Progress is tracked by checking items off (`[x]`); notes on what was learned fol
 
 | Package | Kind | Why |
 |---|---|---|
+| `@vitest/coverage-v8` | dev | Vitest's own coverage provider, pinned to the Vitest version; needed for the coverage baseline and per-file targets (e.g. analyzer > 90%). |
 
 Each item is one commit. Security fixes come first, after CI so every later commit is verified automatically. Items marked **(Q#)** are blocked on an open question.
 
 ### Phase 0: Safety net
 1. [x] **CI workflow.** `.github/workflows/ci.yml`: `npm ci`, typecheck, lint, test, build, `npm audit --omit=dev`. Add `.nvmrc`. *Verify:* push the branch; the Actions run is green, and a deliberately broken test fails it (throwaway commit, not merged).
    - *Done:* Added `.github/workflows/ci.yml` (Node from `.nvmrc` = 24, npm cache, ci → typecheck → lint → test → build → `npm audit --omit=dev --audit-level=high`). Verified locally by running the same steps from a clean `git ls-files` checkout with `npm ci`: all green. **Not yet verified on GitHub: needs a push, which I haven't done.** Learned: npm 11 skips install scripts by default (`@ffmpeg-installer/linux-x64` postinstall is `chmod u+x`), but the tarball's binary is already executable, so ffmpeg still works.
-2. **Coverage tooling.** Add `@vitest/coverage-v8` and a `test:coverage` script, and upload the report in CI. No thresholds yet. *Verify:* CI artifact shows the baseline %, which gets recorded in the PR.
+2. [x] **Coverage tooling.** Add `@vitest/coverage-v8` and a `test:coverage` script, and upload the report in CI. No thresholds yet. *Verify:* CI artifact shows the baseline %, which gets recorded in the PR.
+   - *Done:* `npm run test:coverage` (v8 provider, text-summary + html + json-summary). CI runs it and uploads `coverage/` as an artifact. **Baseline: 8.8% of lines overall; `lib/server` 23.0% (91/395), shared `lib` 84.8%, UI/app/store/hooks 0%.**
 
 ### Phase 1: Security
 3. **Fix SSRF address classification (S-1).** Replace `isPrivateAddress` with byte-level CIDR checks that unwrap mapped, compatible, NAT64 and 6to4 addresses. *Verify:* new `guard.test.ts` cases (`[::ffff:7f00:1]`, `[::ffff:169.254.169.254]`, `[64:ff9b::7f00:1]`, `[2002:7f00:1::]`, `[fec0::1]`, `[febf::1]`, `198.18.0.1`) fail before the change and pass after.
