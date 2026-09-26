@@ -20,16 +20,34 @@ export function rejectCrossSite(req: NextRequest): NextResponse | null {
     return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
   }
   const origin = req.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).host !== req.headers.get("host")) {
-        return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
-      }
-    } catch {
-      return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
-    }
+  if (origin && !isOwnOrigin(origin, req)) {
+    return NextResponse.json({ error: "Cross-site request refused" }, { status: 403 });
   }
   return null;
+}
+
+/**
+ * The addresses this site is reached at: the Host header, the host a proxy
+ * says it forwarded for, and the configured public URL and trusted origins
+ * (the same ones sign-in accepts).
+ */
+function isOwnOrigin(origin: string, req: NextRequest): boolean {
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  const hosts = [req.headers.get("host"), req.headers.get("x-forwarded-host")?.split(",")[0].trim()];
+  if (hosts.includes(url.host)) return true;
+  const configured = [process.env.BETTER_AUTH_URL, ...(process.env.PODBLOCK_TRUSTED_ORIGINS?.split(",") ?? [])];
+  return configured.some((entry) => {
+    try {
+      return Boolean(entry?.trim()) && new URL(entry!.trim()).origin === url.origin;
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** IPv4 ranges that aren't the public internet (IANA special-purpose registry). */

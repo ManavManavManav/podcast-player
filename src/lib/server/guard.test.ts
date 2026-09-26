@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { isPublicAddress, isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 
 function post(headers: Record<string, string>) {
@@ -35,6 +35,39 @@ describe("rejectCrossSite", () => {
     expect(
       rejectCrossSite(post({ "content-type": "application/json", origin: "https://evil.example" }))?.status,
     ).toBe(403);
+  });
+});
+
+describe("rejectCrossSite behind a proxy", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  // e.g. `tailscale serve` or nginx forwarding to localhost:3000 with the Host rewritten.
+  const proxied = (origin: string, extra: Record<string, string> = {}) =>
+    rejectCrossSite(post({ "content-type": "application/json", origin, ...extra }));
+
+  it("accepts the site's configured addresses", () => {
+    vi.stubEnv("PODBLOCK_TRUSTED_ORIGINS", "https://podblock.example.com, http://100.92.248.74:3001");
+    expect(proxied("https://podblock.example.com")).toBeNull();
+    expect(proxied("http://100.92.248.74:3001")).toBeNull();
+    vi.stubEnv("PODBLOCK_TRUSTED_ORIGINS", "");
+    vi.stubEnv("BETTER_AUTH_URL", "https://listen.example.org");
+    expect(proxied("https://listen.example.org")).toBeNull();
+  });
+
+  it("accepts the host the proxy says it forwarded for", () => {
+    expect(proxied("https://podblock.example.com", { "x-forwarded-host": "podblock.example.com" })).toBeNull();
+  });
+
+  it("still refuses everything else", () => {
+    vi.stubEnv("PODBLOCK_TRUSTED_ORIGINS", "https://podblock.example.com");
+    vi.stubEnv("BETTER_AUTH_URL", "https://podblock.example.com");
+    expect(proxied("https://evil.example")?.status).toBe(403);
+    // Same host, other scheme or port: a different origin.
+    expect(proxied("http://podblock.example.com")?.status).toBe(403);
+    expect(proxied("https://podblock.example.com:8443")?.status).toBe(403);
+    expect(proxied("https://evil.example", { "x-forwarded-host": "podblock.example.com" })?.status).toBe(403);
   });
 });
 
