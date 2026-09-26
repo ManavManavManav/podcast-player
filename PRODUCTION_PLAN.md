@@ -305,7 +305,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
    - *Blocked:* Q10 (production branch; commit AGENTS.md/CLAUDE.md; delete `.venv/` and the `TRANSCRIPTION`/`WASM` branches).
 
 ### Phase 8: Docs
-45a. **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG (X-1; split from #45).** *Verify:* a dry run on a fresh clone, following only CONTRIBUTING.md, gets to green `npm run check` and E2E.
+45a. [x] **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG (X-1; split from #45).** *Verify:* a dry run on a fresh clone, following only CONTRIBUTING.md, gets to green `npm run check` and E2E.
+   - *Done:* Added `docs/RUNBOOK.md` (health checks, the full log-event table, deploying + `npm run migrate`, accounts, key rotation effects, re-analysing an episode, backups, a symptom → log-event table), `SECURITY.md` (reporting, protections, known limitations), `CONTRIBUTING.md` (setup, tests, conventions: tests first, env vars, append-only migrations, `log`, `AppError`, `PROMPT_VERSION`) and `CHANGELOG.md` (Unreleased: this branch). The README project layout was updated. **Runbook commands were run, not just written:** the `VACUUM INTO` backup (verbatim, quoting included) and the re-analyse `DELETE` (3 verdicts matched and deleted), both on a copy of your real DB. **Dry run on a fresh clone, following CONTRIBUTING.md only:** `npm ci` → `npm run check` (317 passed) → `npx playwright install chromium` → `npm run build` → `npm run test:e2e` (3 passed); then the fake-providers + `npm run dev` path (doctor all ✓; healthz, readyz and /login 200). Learned from the dry run: port 3000 was taken on this machine and Next silently moved to another port, so CONTRIBUTING now says to open the address it prints. **For you:** GitHub private vulnerability reporting is **disabled** on the repo (checked via the API). SECURITY.md is worded to work either way; enabling it is a repo setting I didn't change.
 45b. **LICENSE (Q11).**
 
 ---

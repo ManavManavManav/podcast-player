@@ -16,7 +16,7 @@ That's enough for development against the fake providers (no keys needed):
 ```bash
 npm run fake-providers   # in one terminal; prints the settings to use
 # put those settings in .env.local, plus BETTER_AUTH_SECRET and PODBLOCK_ADMIN_EMAIL
-npm run dev
+npm run dev              # open the Local address it prints (port 3000 unless that's taken)
 ```
 
 For real podcasts, copy `.env.example` to `.env.local` and fill in the keys (see the README), then `npm run doctor`.
