@@ -88,8 +88,7 @@ describe("checkEnv", () => {
   });
 
   it("accepts the base64 form of the Podcast Index secret", () => {
-    const { PODCAST_INDEX_API_SECRET: _omitted, ...rest } = good;
-    expect(checkEnv({ ...rest, PODCAST_INDEX_API_SECRET_BASE64: "c2VjcmV0" }, production).warnings).toEqual([]);
+    expect(checkEnv({ ...good, PODCAST_INDEX_API_SECRET: undefined, PODCAST_INDEX_API_SECRET_BASE64: "c2VjcmV0" }, production).warnings).toEqual([]);
   });
 
   it("never repeats secret values in its messages", () => {
