@@ -48,7 +48,7 @@ export function UserMenu({
         onClick={() => setOpen((o) => !o)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="hover-breathe grid size-9 place-items-center overflow-hidden rounded-full bg-accent-soft text-sm font-semibold text-accent"
+        className="hover-breathe grid size-10 place-items-center overflow-hidden rounded-full bg-accent text-sm font-medium text-accent-text"
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -60,7 +60,7 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className="animate-toast-in absolute right-0 top-full z-50 mt-2 w-60 rounded-xl border border-border bg-surface p-1 shadow-card"
+          className="animate-toast-in absolute right-0 top-full z-50 mt-2 w-60 rounded-xl border border-border bg-surface p-1 shadow-float"
         >
           <div className="px-3 py-2">
             <p className="truncate text-sm font-medium">{name}</p>

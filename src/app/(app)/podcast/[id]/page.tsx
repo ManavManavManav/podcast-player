@@ -33,17 +33,17 @@ export default async function PodcastPage({ params }: Props) {
           src={podcast.image}
           alt=""
           priority
-          className="size-40 shrink-0 rounded-2xl shadow-card sm:size-52"
+          className="size-40 shrink-0 rounded-[22px] sm:size-52"
         />
         <div className="min-w-0 space-y-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl">{podcast.title}</h1>
-            {podcast.author && <p className="mt-1 text-muted">{podcast.author}</p>}
+            <h1 className="font-serif text-4xl leading-[1.05] tracking-[-0.02em] text-balance sm:text-[56px]">{podcast.title}</h1>
+            {podcast.author && <p className="mt-2 text-muted">{podcast.author}</p>}
           </div>
           {podcast.categories.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {podcast.categories.slice(0, 5).map((c) => (
-                <li key={c} className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-muted">
+                <li key={c} className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
                   {c}
                 </li>
               ))}
@@ -67,8 +67,8 @@ export default async function PodcastPage({ params }: Props) {
       )}
 
       <section>
-        <h2 className="mb-3 text-xl font-semibold tracking-tight">
-          Episodes <span className="text-base font-normal text-faint">{episodes.length}</span>
+        <h2 className="mb-6 flex items-baseline gap-3 font-serif text-[34px] leading-tight tracking-[-0.01em]">
+          Episodes <span className="font-mono text-[13px] text-faint">{episodes.length}</span>
         </h2>
         {episodes.length ? (
           <EpisodeList episodes={episodes} />

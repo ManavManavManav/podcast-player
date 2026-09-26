@@ -57,8 +57,8 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
     .map(([w]) => Number(w));
 
   return (
-    <div className="flex items-center gap-3 text-[11px] tabular-nums text-muted">
-      <span className="w-12 text-right">{formatClock(shown)}</span>
+    <div className="flex items-center gap-3 font-mono text-[11px] text-muted">
+      <span className="w-14 text-right">{formatClock(shown)}</span>
       <div
         ref={track}
         role="slider"
@@ -89,7 +89,7 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
         onPointerLeave={() => setHover(null)}
         className="group relative h-6 flex-1 cursor-pointer touch-none select-none"
       >
-        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-surface-2">
+        <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 overflow-hidden rounded-full bg-surface-2">
           {scanned.map((w) => (
             <div
               key={`s${w}`}
@@ -111,21 +111,21 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
           {ads.map((ad) => (
             <div
               key={ad.start}
-              className={`absolute inset-y-0 bg-ad ${ad.end <= shown ? "opacity-50" : ""}`}
+              className={`absolute inset-y-0 rounded-sm bg-ad ${ad.end <= shown ? "opacity-50" : ""}`}
               style={{ left: pct(ad.start), width: pct(ad.end - ad.start) }}
               title={`Ad · ${formatClock(ad.start)}–${formatClock(ad.end)}`}
             />
           ))}
         </div>
         <div
-          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent shadow ring-2 ring-surface transition-transform ${
+          className={`absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface transition-transform ${
             drag !== null ? "scale-125" : "scale-0 group-hover:scale-100 group-focus-visible:scale-100"
           } ${drag === null ? "transition-[left] duration-300 ease-linear" : ""}`}
           style={{ left: pct(shown) }}
         />
         {hover !== null && drag === null && (
           <div
-            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-text px-1.5 py-0.5 text-[11px] text-bg shadow"
+            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-text px-1.5 py-0.5 text-[11px] text-bg"
             style={{ left: pct(hover) }}
           >
             {formatClock(hover)}
@@ -133,7 +133,7 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
           </div>
         )}
       </div>
-      <span className="w-12">{known ? `-${formatClock(Math.max(0, duration - shown))}` : "--:--"}</span>
+      <span className="w-14">{known ? `-${formatClock(Math.max(0, duration - shown))}` : "--:--"}</span>
     </div>
   );
 }

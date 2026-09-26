@@ -6,17 +6,17 @@ export function PodcastCard({ podcast, priority = false }: { podcast: Podcast; p
   return (
     <Link
       href={`/podcast/${podcast.id}`}
-      className="hover-wave group -m-1.5 flex flex-col gap-2.5 overflow-hidden rounded-2xl p-1.5 transition-colors hover:bg-surface-2/70"
+      className="hover-wave group flex h-full flex-col gap-3 overflow-hidden rounded-[22px] bg-surface p-3 pb-4"
     >
       <Artwork
         src={podcast.image}
         alt=""
         priority={priority}
-        className="aspect-square w-full rounded-xl shadow-card transition-transform duration-300 ease-out group-hover:-translate-y-0.5"
+        className="aspect-square w-full rounded-[14px] transition-transform duration-300 ease-out group-hover:-translate-y-0.5"
       />
-      <div className="min-w-0 px-0.5">
-        <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{podcast.title}</h3>
-        {podcast.author && <p className="mt-0.5 truncate text-xs text-muted">{podcast.author}</p>}
+      <div className="min-w-0 px-1">
+        <h3 className="line-clamp-2 text-[15px] font-medium leading-snug">{podcast.title}</h3>
+        {podcast.author && <p className="mt-0.5 truncate text-[13px] text-faint">{podcast.author}</p>}
       </div>
     </Link>
   );
@@ -24,7 +24,7 @@ export function PodcastCard({ podcast, priority = false }: { podcast: Podcast; p
 
 export function PodcastGrid({ podcasts, priorityCount = 0 }: { podcasts: Podcast[]; priorityCount?: number }) {
   return (
-    <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-6">
       {podcasts.map((podcast, i) => (
         <li key={podcast.id}>
           <PodcastCard podcast={podcast} priority={i < priorityCount} />
@@ -36,10 +36,10 @@ export function PodcastGrid({ podcasts, priorityCount = 0 }: { podcasts: Podcast
 
 export function PodcastGridSkeleton({ count = 12 }: { count?: number }) {
   return (
-    <ul className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" aria-hidden="true">
+    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-6" aria-hidden="true">
       {Array.from({ length: count }, (_, i) => (
-        <li key={i} className="flex flex-col gap-2.5">
-          <div className="skeleton aspect-square w-full rounded-xl" />
+        <li key={i} className="flex flex-col gap-3 rounded-[22px] bg-surface p-3 pb-4">
+          <div className="skeleton aspect-square w-full rounded-[14px]" />
           <div className="skeleton h-3.5 w-4/5 rounded" />
           <div className="skeleton h-3 w-1/2 rounded" />
         </li>

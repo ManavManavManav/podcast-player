@@ -46,7 +46,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
 
   return (
     <section className="space-y-4">
-      <p className="text-sm text-muted">
+      <p className="font-mono text-[13px] text-faint">
         {users.length} {users.length === 1 ? "account" : "accounts"}
         {pending > 0 && <span className="font-medium text-ad-text"> · {pending} waiting for approval</span>}
       </p>
@@ -58,7 +58,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
       )}
       {notice && <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
 
-      <ul className="divide-y divide-border rounded-2xl border border-border bg-surface">
+      <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-2">
         {users.map((user) => {
           const self = user.id === selfId;
           const button = (action: Action, label: string, danger = false) => (
@@ -78,8 +78,8 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
           return (
             <li key={user.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
               <div className="min-w-0 flex-1 basis-60">
-                <p className="flex items-center gap-2 truncate text-sm font-medium">
-                  <span className="truncate">{user.name || user.email}</span>
+                <p className="flex items-center gap-2 truncate">
+                  <span className="truncate font-serif text-xl">{user.name || user.email}</span>
                   <Status user={user} />
                 </p>
                 <p className="truncate text-xs text-muted">
@@ -87,7 +87,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                 </p>
               </div>
 
-              <p className="text-xs tabular-nums text-muted" title="This month: minutes transcribed, detector calls, tokens in/out">
+              <p className="font-mono text-xs text-faint" title="This month: minutes transcribed, detector calls, tokens in/out">
                 {user.usage.audioMinutes} min · {user.usage.detectCalls} calls ·{" "}
                 {Math.round((user.usage.inputTokens + user.usage.outputTokens) / 1000)}k tokens
               </p>
@@ -127,12 +127,12 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                     placeholder="New password (10+ characters)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-bg px-3 text-sm focus:border-accent focus:outline-none"
+                    className="h-10 min-w-0 flex-1 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
                   />
                   <button
                     type="submit"
                     disabled={busy !== null}
-                    className="h-9 rounded-full bg-accent px-4 text-xs font-semibold text-accent-text disabled:opacity-50"
+                    className="h-10 rounded-full bg-accent px-5 text-xs font-medium text-accent-text disabled:opacity-50"
                   >
                     Save
                   </button>

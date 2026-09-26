@@ -42,9 +42,9 @@ export function AuthForm({
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6 shadow-card sm:p-7">
-      <h1 className="text-xl font-semibold tracking-tight">{signup ? "Create your account" : "Sign in"}</h1>
-      <p className="mt-1 text-sm text-muted">
+    <div className="rounded-3xl bg-surface p-6 sm:p-8">
+      <h1 className="font-serif text-3xl tracking-[-0.01em]">{signup ? "Create your account" : "Sign in"}</h1>
+      <p className="mt-2 text-sm text-muted">
         {signup ? "New accounts are approved by this server's owner before first use." : "Welcome back."}
       </p>
 
@@ -57,7 +57,7 @@ export function AuthForm({
                 type="button"
                 disabled={pending}
                 onClick={() => authClient.signIn.social({ provider, callbackURL: next })}
-                className="hover-breathe h-10 rounded-full border border-border text-sm font-medium hover:bg-surface-2 disabled:opacity-60 [--hover-scale:1.02]"
+                className="hover-breathe h-11 rounded-full border border-accent text-sm font-medium disabled:opacity-60 [--hover-scale:1.02]"
               >
                 Continue with {PROVIDER_LABELS[provider]}
               </button>
@@ -108,7 +108,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="hover-breathe mt-1 flex h-11 items-center justify-center gap-2 rounded-full bg-accent text-sm font-semibold text-accent-text shadow-card disabled:opacity-60 [--hover-scale:1.02]"
+          className="hover-breathe mt-2 flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-medium text-accent-text disabled:opacity-60 [--hover-scale:1.02]"
         >
           {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
           {signup ? "Create account" : "Sign in"}
@@ -137,7 +137,7 @@ export function AuthForm({
 }
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text transition focus:border-accent focus:outline-none";
+  "h-11 w-full rounded-full bg-bg px-4 text-sm text-text transition focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (

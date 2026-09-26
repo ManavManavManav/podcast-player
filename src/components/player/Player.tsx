@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Artwork } from "@/components/Artwork";
 import { MenuItem, Popover } from "@/components/player/Popover";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
+import { BAR_FADE_MS, BAR_REVEAL_MS, burstInProgress } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Timeline } from "@/components/player/Timeline";
 import { useAdScanner } from "@/hooks/useAdScanner";
@@ -319,7 +320,7 @@ export function Player({ userId }: { userId: string }) {
           <div className="pointer-events-auto">
             {notice && <SkipToast notice={notice} holding={holding} onUndo={undoSkip} onDismiss={dismissNotice} />}
             {panelOpen && <NowPlayingPanel />}
-            <PlayerBar />
+            <PlayerBar key={episode.id} />
           </div>
         </div>
       )}
@@ -335,16 +336,24 @@ function PlayerBar() {
   const { toggle, skipBy, seek, stop } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
+  // Started from a play button's burst: stay hidden until the sticks land here.
+  const [materialize] = useState(burstInProgress);
 
   return (
-    <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border bg-surface/95 px-3 pb-2 pt-3 shadow-card backdrop-blur-xl sm:px-4">
+    <div
+      data-player-bar
+      style={materialize ? { animationDelay: `${BAR_REVEAL_MS - 50}ms`, animationDuration: `${BAR_FADE_MS}ms` } : undefined}
+      className={`mx-auto w-full max-w-[69rem] rounded-3xl bg-surface/80 px-3 pb-2 pt-3 shadow-float backdrop-blur-2xl backdrop-saturate-150 sm:px-5 ${
+        materialize ? "animate-bar-materialize" : ""
+      }`}
+    >
       <div className="flex items-center gap-3">
         <Link href={`/podcast/${episode.podcastId}`} className="shrink-0" aria-label={`Go to ${episode.podcastTitle}`}>
-          <Artwork src={episode.image} alt="" priority className="size-11 rounded-lg" />
+          <Artwork src={episode.image} alt="" priority className="size-12 rounded-xl" />
         </Link>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold leading-tight">{episode.title}</p>
-          <p className="truncate text-xs text-muted">
+          <p className="truncate font-serif text-lg leading-tight">{episode.title}</p>
+          <p className="truncate text-[13px] text-muted">
             {error ? <span className="text-danger">{error}</span> : episode.podcastTitle}
           </p>
         </div>
@@ -357,7 +366,7 @@ function PlayerBar() {
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="hover-breathe grid size-11 place-items-center rounded-full bg-accent text-accent-text shadow-card [--hover-scale:1.08]"
+            className="hover-breathe grid size-12 place-items-center rounded-full bg-accent text-accent-text [--hover-scale:1.08]"
           >
             {(buffering && playing) || holding ? (
               <LoaderCircle className="size-5 animate-spin" />
@@ -411,15 +420,15 @@ function SecondaryControls() {
         aria-pressed={autoSkip}
         title={autoSkip ? `Skipping ads · ${stats.adsSkipped} skipped so far` : "Ad skipping is off"}
         className={`hover-breathe flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium [--hover-scale:1.04] ${
-          autoSkip ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-2"
+          autoSkip ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2"
         }`}
       >
-        {autoSkip ? <ShieldCheck className="size-4" /> : <ShieldOff className="size-4" />}
-        <span>{autoSkip ? "Skip ads" : "Ads on"}</span>
-        {adCount > 0 && <span className="rounded-full bg-ad-soft px-1.5 text-[10px] text-ad-text">{adCount}</span>}
+        {autoSkip ? <ShieldCheck className="size-4 text-ad" /> : <ShieldOff className="size-4" />}
+        <span>{autoSkip ? "Skipping ads" : "Ads on"}</span>
+        {adCount > 0 && <span className="font-mono text-[11px] text-muted">{adCount}</span>}
       </button>
 
-      <Popover label="Playback speed" trigger={<span className="tabular-nums">{rate}×</span>}>
+      <Popover label="Playback speed" trigger={<span className="font-mono">{rate}×</span>}>
         {(close) =>
           PLAYBACK_RATES.map((r) => (
             <MenuItem
@@ -494,7 +503,7 @@ function SleepCountdown({ until }: { until: number }) {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  return <span className="tabular-nums text-accent">{formatClock((until - now) / 1000)}</span>;
+  return <span className="font-mono text-accent">{formatClock((until - now) / 1000)}</span>;
 }
 
 function VolumeControl() {

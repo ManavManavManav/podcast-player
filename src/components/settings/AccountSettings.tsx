@@ -33,8 +33,8 @@ export function AccountSettings({ name, email }: { name: string; email: string }
   };
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold">Account</h2>
+    <section className="rounded-3xl bg-surface p-6 sm:p-8">
+      <h2 className="font-serif text-3xl">Account</h2>
       <dl className="mt-4 grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
         <dt className="text-muted">Name</dt>
         <dd>{name}</dd>
@@ -43,7 +43,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
       </dl>
 
       <form onSubmit={changePassword} className="mt-6 grid max-w-sm gap-3">
-        <h3 className="text-sm font-medium">Change password</h3>
+        <h3 className="font-serif text-xl">Change password</h3>
         <input
           type="password"
           required
@@ -51,7 +51,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           placeholder="Current password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          className="h-10 rounded-lg border border-border bg-bg px-3 text-sm focus:border-accent focus:outline-none"
+          className="h-11 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
         <input
           type="password"
@@ -61,13 +61,13 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           placeholder="New password (10+ characters)"
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          className="h-10 rounded-lg border border-border bg-bg px-3 text-sm focus:border-accent focus:outline-none"
+          className="h-11 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
             disabled={busy}
-            className="hover-breathe flex h-10 items-center gap-2 rounded-full border border-border px-5 text-sm font-medium hover:bg-surface-2 disabled:opacity-50 [--hover-scale:1.04]"
+            className="hover-breathe flex h-11 items-center gap-2 rounded-full bg-accent px-6 text-sm font-medium text-accent-text disabled:opacity-50 [--hover-scale:1.04]"
           >
             {busy && <LoaderCircle className="size-4 animate-spin" />}
             Change password

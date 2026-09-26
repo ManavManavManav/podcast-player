@@ -1,31 +1,27 @@
 import { Suspense } from "react";
-import { ContinueListening } from "@/components/ContinueListening";
+import { ContinueListening, HeroActions } from "@/components/ContinueListening";
 import { PodcastGrid, PodcastGridSkeleton } from "@/components/PodcastCard";
-import { SearchBox } from "@/components/SearchBox";
 import { trendingPodcasts } from "@/lib/server/podcastIndex";
 
 export default function HomePage() {
   return (
-    <div className="space-y-14">
-      <section className="mx-auto max-w-2xl pt-6 text-center sm:pt-12">
-        <h1 className="text-4xl font-bold tracking-tight text-balance sm:text-5xl">
-          Podcasts, <span className="text-muted">minus the ads.</span>
+    <div className="space-y-16 sm:space-y-20">
+      <section className="flex flex-col items-center pt-8 text-center sm:pt-14">
+        <h1 className="font-serif text-[46px] leading-[1.02] tracking-[-0.02em] text-balance sm:text-[76px]">
+          Podcasts,
+          <br />
+          minus the ads.
         </h1>
-        <p className="mx-auto mt-4 max-w-lg text-pretty text-muted sm:text-lg">
-          Podblock listens a few minutes ahead of you, spots sponsor reads and inserted ads, and skips
-          straight past them.
+        <p className="mt-6 max-w-[34rem] text-pretty leading-relaxed text-muted sm:text-lg">
+          Podblock listens a few minutes ahead of you, finds the sponsor reads, and skips straight past them.
         </p>
-        <div className="mt-8">
-          <Suspense>
-            <SearchBox size="lg" />
-          </Suspense>
-        </div>
+        <HeroActions />
       </section>
 
       <ContinueListening />
 
       <section>
-        <h2 className="mb-5 text-xl font-semibold tracking-tight">Trending now</h2>
+        <h2 className="mb-6 font-serif text-[34px] leading-tight tracking-[-0.01em]">Trending now</h2>
         <Suspense fallback={<PodcastGridSkeleton />}>
           <Trending />
         </Suspense>
@@ -38,7 +34,7 @@ async function Trending() {
   const podcasts = await trendingPodcasts(24).catch(() => null);
   if (!podcasts) {
     return (
-      <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">
+      <p className="rounded-3xl bg-surface p-8 text-center text-sm text-muted">
         Couldn&apos;t load trending podcasts. Check your Podcast Index API keys and connection.
       </p>
     );

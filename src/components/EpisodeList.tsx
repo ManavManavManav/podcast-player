@@ -1,13 +1,15 @@
 "use client";
 
 import { Pause, Play } from "lucide-react";
+import { useRef } from "react";
+import { playBurst } from "@/components/player/PlayBurst";
 import { formatDate, formatDuration } from "@/lib/text";
 import type { Episode } from "@/lib/types";
 import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
 
 export function EpisodeList({ episodes }: { episodes: Episode[] }) {
   return (
-    <ul className="divide-y divide-border border-y border-border">
+    <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-4 sm:px-6">
       {episodes.map((episode) => (
         <EpisodeRow key={episode.id} episode={episode} />
       ))}
@@ -22,7 +24,13 @@ function EpisodeRow({ episode }: { episode: Episode }) {
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
 
-  const onClick = () => (isCurrent ? toggle() : play(episode));
+  const playButton = useRef<HTMLButtonElement>(null);
+
+  const onClick = () => {
+    if (isCurrent) return toggle();
+    playBurst(playButton.current);
+    play(episode);
+  };
   const remaining = episode.duration ? episode.duration * (1 - progress) : 0;
   const started = progress > 0.01;
   const finished = progress > 0.97;
@@ -34,13 +42,14 @@ function EpisodeRow({ episode }: { episode: Episode }) {
   ].filter(Boolean);
 
   return (
-    <li className="hover-wave group flex gap-4 overflow-hidden py-4">
+    <li className="hover-wave group relative flex gap-4 overflow-hidden py-5">
       <button
+        ref={playButton}
         onClick={onClick}
         aria-label={`${playing ? "Pause" : "Play"} ${episode.title}`}
         className={`hover-breathe relative z-[2] mt-0.5 grid size-11 shrink-0 place-items-center rounded-full ${
           isCurrent
-            ? "bg-accent text-accent-text shadow-card"
+            ? "bg-accent text-accent-text"
             : "bg-surface-2 text-text group-hover:bg-accent group-hover:text-accent-text"
         }`}
       >
@@ -48,14 +57,14 @@ function EpisodeRow({ episode }: { episode: Episode }) {
         {started && !finished && !isCurrent && <ProgressRing progress={progress} />}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="text-xs text-faint">{meta.join(" · ")}</p>
-        <h3 className={`mt-0.5 font-medium leading-snug ${isCurrent ? "text-accent" : ""} ${finished ? "text-muted" : ""}`}>
+        <p className="font-mono text-xs text-faint">{meta.join(" · ")}</p>
+        <h3 className={`mt-1 font-serif text-xl leading-snug ${finished ? "text-muted" : ""}`}>
           <button onClick={onClick} className="text-left after:absolute after:inset-0 after:content-['']">
             {episode.title}
           </button>
         </h3>
         {episode.description && episode.description !== episode.title && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted">{episode.description}</p>
+          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted">{episode.description}</p>
         )}
       </div>
     </li>

@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Logo } from "@/components/Logo";
 import { SearchBox } from "@/components/SearchBox";
 import { SetupNotice } from "@/components/SetupNotice";
 import { UserMenu } from "@/components/UserMenu";
+import { PlayBurst } from "@/components/player/PlayBurst";
 import { Player } from "@/components/player/Player";
 import { currentUser } from "@/lib/server/session";
 
@@ -22,10 +24,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-bg/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
+      <header className="sticky top-0 z-40 bg-bg/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-[76px] max-w-6xl items-center gap-3 px-4 sm:gap-8 sm:px-6">
           <Logo />
-          <div className="ml-auto w-full max-w-md">
+          <nav className="hidden items-center gap-7 text-[15px] md:flex">
+            <Link href="/" className="font-medium hover:text-muted">
+              Discover
+            </Link>
+            {user.role === "admin" && (
+              <Link href="/admin" className="text-muted hover:text-text">
+                Users
+              </Link>
+            )}
+          </nav>
+          <div className="ml-auto w-full max-w-xs">
             <Suspense>
               <SearchBox />
             </Suspense>
@@ -34,10 +46,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       <SetupNotice isAdmin={user.role === "admin"} />
-      <main id="main" className="mx-auto max-w-6xl px-4 pb-48 pt-8 sm:px-6">
+      <main id="main" className="mx-auto max-w-6xl px-4 pb-48 pt-6 sm:px-6">
         {children}
       </main>
       <Player userId={user.id} />
+      <PlayBurst />
     </>
   );
 }

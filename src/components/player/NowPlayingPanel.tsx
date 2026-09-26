@@ -19,15 +19,15 @@ export function NowPlayingPanel() {
   return (
     <section
       aria-label="Transcript and ads"
-      className="animate-toast-in mx-auto mb-2 flex max-h-[min(60dvh,32rem)] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-card"
+      className="animate-toast-in mx-auto mb-2 flex max-h-[min(62dvh,36rem)] w-full max-w-[69rem] flex-col overflow-hidden rounded-3xl bg-surface shadow-float"
     >
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
-        <div role="tablist" className="flex gap-1">
+      <div className="flex items-center gap-2 px-4 pb-2 pt-4 sm:px-5">
+        <div role="tablist" className="flex gap-2">
           <TabButton active={tab === "transcript"} onClick={() => setTab("transcript")}>
             Transcript
           </TabButton>
           <TabButton active={tab === "ads"} onClick={() => setTab("ads")}>
-            Ads found{ads.length > 0 && <span className="ml-1.5 rounded-full bg-ad-soft px-1.5 text-ad-text">{ads.length}</span>}
+            Ad breaks{ads.length > 0 && <span className="ml-1.5 font-mono text-xs opacity-70">{ads.length}</span>}
           </TabButton>
         </div>
         <ScanStatus />
@@ -50,8 +50,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`hover-breathe flex items-center rounded-full px-3 py-1 text-sm font-medium [--hover-scale:1.04] ${
-        active ? "bg-surface-2 text-text" : "text-muted hover:text-text"
+      className={`hover-breathe flex h-9 items-center rounded-full px-4 text-sm font-medium [--hover-scale:1.04] ${
+        active ? "bg-accent text-accent-text" : "bg-surface-2 text-text"
       }`}
     >
       {children}
@@ -79,7 +79,7 @@ function ScanStatus() {
   }
 
   return (
-    <p className="ml-auto flex items-center gap-1.5 truncate text-xs text-faint">
+    <p className="ml-auto flex items-center gap-1.5 truncate font-mono text-xs text-faint">
       {scanning && <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />}
       {scanning ? "Listening ahead…" : done ? `${(done * WINDOW_SECONDS) / 60} min analyzed` : ""}
     </p>
@@ -125,7 +125,7 @@ function Transcript() {
         ref={container}
         onWheel={() => setFollow(false)}
         onTouchMove={() => setFollow(false)}
-        className="relative min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3"
+        className="relative min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 pb-4 pt-2 sm:px-4"
       >
         {segments.map((segment, i) => (
           <TranscriptLine
@@ -142,7 +142,7 @@ function Transcript() {
       {!follow && (
         <button
           onClick={() => setFollow(true)}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-text px-3 py-1 text-xs font-medium text-bg shadow-card"
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-text"
         >
           Jump to now
         </button>
@@ -170,11 +170,13 @@ function TranscriptLine({
     <button
       data-index={index}
       onClick={() => onSeek(segment.start)}
-      className={`hover-fill flex w-full gap-3 rounded-lg px-2 py-1 text-left text-[15px] leading-relaxed ${
-        active ? "bg-accent-soft text-text" : past ? "text-muted" : "text-text"
-      } ${ad ? "border-l-2 border-ad bg-ad-soft/60" : ""}`}
+      className={`hover-fill flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-[15px] leading-relaxed ${
+        ad ? "bg-ad-soft text-muted" : active ? "bg-surface-2 font-medium text-text" : past ? "text-muted" : "text-text"
+      }`}
     >
-      <span className="w-11 shrink-0 pt-0.5 text-right text-xs tabular-nums text-faint">{formatClock(segment.start)}</span>
+      <span className={`w-14 shrink-0 pt-0.5 font-mono text-xs ${ad ? "text-ad-text" : active ? "text-text" : "text-faint"}`}>
+        {formatClock(segment.start)}
+      </span>
       <span className="min-w-0 flex-1">{segment.text}</span>
     </button>
   );
@@ -196,11 +198,11 @@ function AdList() {
 
   const total = ads.reduce((sum, ad) => sum + (ad.end - ad.start), 0);
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-      <p className="mb-2 px-2 text-xs text-muted">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-2 sm:px-5">
+      <p className="mb-3 font-mono text-xs text-faint">
         {ads.length} ad {ads.length === 1 ? "break" : "breaks"} · {formatDuration(total)} total
       </p>
-      <ul className="space-y-1.5">
+      <ul className="grid gap-3 md:grid-cols-2">
         {ads.map((ad) => {
           const preview = segments
             .filter((s) => s.end > ad.start && s.start < ad.end)
@@ -211,17 +213,16 @@ function AdList() {
             <li key={ad.start}>
               <button
                 onClick={() => seek(ad.start)}
-                className="hover-wave w-full overflow-hidden rounded-xl border border-border px-3 py-2.5 text-left"
+                className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-2xl bg-ad-soft px-4 py-3.5 text-left"
               >
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium tabular-nums">
-                    {formatClock(ad.start)} – {formatClock(ad.end)}
-                  </span>
-                  <span className="rounded-full bg-ad-soft px-1.5 py-px text-ad-text">{formatDuration(ad.end - ad.start)}</span>
-                  <span className="ml-auto text-faint">{status}</span>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="truncate font-serif text-xl">{advertiser(ad)}</span>
+                  <span className="shrink-0 font-mono text-xs text-ad-text">{status}</span>
                 </div>
-                {preview && <p className="mt-1 line-clamp-2 text-sm text-muted">{preview}</p>}
-                {ad.reason && <p className="mt-1 text-[11px] text-faint">Spotted by: {ad.reason}</p>}
+                <span className="font-mono text-xs text-muted">
+                  {formatClock(ad.start)} – {formatClock(ad.end)} · {formatDuration(ad.end - ad.start)}
+                </span>
+                {preview && <p className="line-clamp-2 text-sm text-muted">{preview}</p>}
               </button>
             </li>
           );
@@ -229,4 +230,13 @@ function AdList() {
       </ul>
     </div>
   );
+}
+
+/** "Ad: Sierra" → "Sierra"; several merged ads read "Ad: A; Ad: B" → "A, B". */
+function advertiser(ad: AdRange): string {
+  const names = ad.reason
+    .split(";")
+    .map((part) => part.trim().replace(/^Ad:?\s*/i, ""))
+    .filter(Boolean);
+  return names.length ? [...new Set(names)].join(", ") : "Ad";
 }

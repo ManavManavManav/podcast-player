@@ -5,44 +5,47 @@
    the raw values live here and flip for dark mode.
    ------------------------------------------------------------------------- */
 
+/* Warm off-white ground, white cards told apart by tone alone (no borders or
+   shadows), near-black ink. The one color is the ad orange. */
 :root {
-  --bg: #ffffff;
+  --bg: #f6f5f1;
   --surface: #ffffff;
-  --surface-2: #f5f5f5;
-  --border: #e5e5e5;
-  --text: #171717;
-  --muted: #666666;
-  --faint: #a1a1a1;
-  /* Monochrome, like Next.js's own theme: "accent" is just the foreground. */
-  --accent: #171717;
-  --accent-soft: #f2f2f2;
-  --accent-text: #ffffff;
-  /* The one functional color: ad markers. */
-  --ad: #e08a00;
-  --ad-soft: #fff4e0;
-  --ad-text: #8a5300;
-  --danger: #e5484d;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px -6px rgb(0 0 0 / 0.08);
+  --surface-2: #efede7;
+  --border: #e4e2db;
+  --text: #0b0b0b;
+  --muted: #55534e;
+  --faint: #6f6c66;
+  --accent: #0b0b0b;
+  --accent-soft: #efede7;
+  --accent-text: #f6f5f1;
+  --ad: #d9480f;
+  --ad-soft: #fbeee5;
+  --ad-text: #b03a0a;
+  --danger: #d92d20;
+  --shadow: none;
+  /* Floating layers (menus) still need to lift off the page. */
+  --shadow-float: 0 12px 32px -12px rgb(0 0 0 / 0.18);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0a0a0a;
-    --surface: #0f0f0f;
-    --surface-2: #1a1a1a;
-    --border: #262626;
-    --text: #ededed;
-    --muted: #a1a1a1;
-    --faint: #6b6b6b;
-    --accent: #ededed;
-    --accent-soft: #1f1f1f;
-    --accent-text: #0a0a0a;
-    --ad: #f5a524;
-    --ad-soft: #2a1f0a;
-    --ad-text: #f7c46c;
-    --danger: #ff6369;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+    --bg: #0c0c0b;
+    --surface: #171715;
+    --surface-2: #22211f;
+    --border: #2c2b28;
+    --text: #f2f1ec;
+    --muted: #b3b0a8;
+    --faint: #8e8b84;
+    --accent: #f2f1ec;
+    --accent-soft: #22211f;
+    --accent-text: #0c0c0b;
+    --ad: #f2762e;
+    --ad-soft: #2e1b10;
+    --ad-text: #f5a06a;
+    --danger: #ff6b5e;
+    --shadow: none;
+    --shadow-float: 0 12px 32px -12px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 }
@@ -63,7 +66,9 @@
   --color-ad-text: var(--ad-text);
   --color-danger: var(--danger);
   --shadow-card: var(--shadow);
+  --shadow-float: var(--shadow-float);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-newsreader), Georgia, ui-serif, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
@@ -124,6 +129,25 @@ body {
 
 .animate-toast-in {
   animation: toast-in 180ms ease-out;
+}
+
+/* The player bar appearing where the play burst's sticks land (PlayBurst.tsx, BAR_REVEAL_MS). */
+@keyframes bar-materialize {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+
+.animate-bar-materialize {
+  /* Delay and duration are set inline from PlayBurst's timing. */
+  animation: bar-materialize 350ms cubic-bezier(0.33, 1, 0.68, 1) both;
 }
 
 /* ---------------------------------------------------------------------------

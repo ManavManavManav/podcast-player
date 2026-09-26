@@ -51,7 +51,7 @@ export function Popover({
         <div
           id={id}
           role="menu"
-          className={`animate-toast-in absolute bottom-full z-10 mb-2 min-w-36 rounded-xl border border-border bg-surface p-1 shadow-card ${
+          className={`animate-toast-in absolute bottom-full z-10 mb-2 min-w-36 rounded-xl border border-border bg-surface p-1 shadow-float ${
             align === "end" ? "right-0" : "left-1/2 -translate-x-1/2"
           }`}
         >

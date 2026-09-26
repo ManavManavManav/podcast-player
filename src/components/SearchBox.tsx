@@ -53,8 +53,8 @@ export function SearchBox({ size = "md", autoFocus = false }: { size?: "md" | "l
         aria-label="Search podcasts"
         autoFocus={autoFocus}
         enterKeyHint="search"
-        className={`w-full rounded-full border border-border bg-surface text-text placeholder:text-faint shadow-card transition focus:border-accent focus:outline-none [&::-webkit-search-cancel-button]:hidden ${
-          large ? "h-14 pl-13 pr-12 text-base" : "h-10 pl-10 pr-9 text-sm"
+        className={`w-full rounded-full bg-surface text-text placeholder:text-faint transition focus:outline-none focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-search-cancel-button]:hidden ${
+          large ? "h-14 pl-13 pr-12 text-base" : "h-[42px] pl-10 pr-9 text-sm"
         }`}
       />
       {query && (
@@ -71,7 +71,7 @@ export function SearchBox({ size = "md", autoFocus = false }: { size?: "md" | "l
         </button>
       )}
       {!query && size === "md" && (
-        <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-border px-1.5 text-[11px] text-faint sm:block">
+        <kbd className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 font-mono text-xs text-faint sm:block">
           /
         </kbd>
       )}

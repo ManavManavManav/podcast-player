@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // The floating dev badge sits on top of the player bar's controls.
   devIndicators: false,
+  // Other hosts the dev server is opened from (e.g. over a LAN or tailnet),
+  // comma-separated, so live reload works there too.
+  allowedDevOrigins: process.env.DEV_ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean),
   // Loaded from node_modules at runtime rather than bundled: the database
   // driver has native parts, and ffmpeg is a binary.
   serverExternalPackages: ["@libsql/client", "@libsql/kysely-libsql", "@ffmpeg-installer/ffmpeg"],
