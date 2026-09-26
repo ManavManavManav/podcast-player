@@ -78,4 +78,29 @@ describe("detectAds", () => {
     expect(parseError).toBeInstanceOf(AppError);
     expect(parseError.kind).toBe("detection");
   });
+
+  it("doesn't give up on the extras for errors that aren't about them (E-3)", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-context" };
+    const tooLong = () => Response.json({ error: { message: "This model's maximum context length is 8192 tokens" } }, { status: 400 });
+    vi.stubGlobal("fetch", vi.fn(async () => tooLong()));
+    await expect(detectAds(window, [], {}, config)).rejects.toThrow(/context length/);
+
+    const fetchMock = vi.fn(async () => answer('{"ads":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    await detectAds(window, [], {}, config);
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).thinking).toEqual({ type: "disabled" });
+  });
+
+  it("retries once when the provider is rate-limiting or briefly down", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-retry" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503, headers: { "retry-after": "0" } }))
+      .mockImplementation(async () => answer('{"ads":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await detectAds(window, [], {}, config)).ads).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Still asked with the extras: a 503 says nothing about them.
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).thinking).toEqual({ type: "disabled" });
+  });
 });
