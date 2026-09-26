@@ -190,7 +190,8 @@ Progress is tracked by checking items off (`[x]`); notes on what was learned fol
 Each item is one commit. Security fixes come first, after CI so every later commit is verified automatically. Items marked **(Q#)** are blocked on an open question.
 
 ### Phase 0: Safety net
-1. **CI workflow.** `.github/workflows/ci.yml`: `npm ci`, typecheck, lint, test, build, `npm audit --omit=dev`. Add `.nvmrc`. *Verify:* push the branch; the Actions run is green, and a deliberately broken test fails it (throwaway commit, not merged).
+1. [x] **CI workflow.** `.github/workflows/ci.yml`: `npm ci`, typecheck, lint, test, build, `npm audit --omit=dev`. Add `.nvmrc`. *Verify:* push the branch; the Actions run is green, and a deliberately broken test fails it (throwaway commit, not merged).
+   - *Done:* Added `.github/workflows/ci.yml` (Node from `.nvmrc` = 24, npm cache, ci → typecheck → lint → test → build → `npm audit --omit=dev --audit-level=high`). Verified locally by running the same steps from a clean `git ls-files` checkout with `npm ci`: all green. **Not yet verified on GitHub: needs a push, which I haven't done.** Learned: npm 11 skips install scripts by default (`@ffmpeg-installer/linux-x64` postinstall is `chmod u+x`), but the tarball's binary is already executable, so ffmpeg still works.
 2. **Coverage tooling.** Add `@vitest/coverage-v8` and a `test:coverage` script, and upload the report in CI. No thresholds yet. *Verify:* CI artifact shows the baseline %, which gets recorded in the PR.
 
 ### Phase 1: Security
