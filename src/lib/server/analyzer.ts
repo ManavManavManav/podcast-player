@@ -9,7 +9,7 @@ import { AppError } from "@/lib/server/errors";
 import { detectAds } from "@/lib/server/llm/detect";
 import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { transcribe } from "@/lib/server/transcribe";
-import { addUsage } from "@/lib/server/usage";
+import { usageStatement } from "@/lib/server/usage";
 
 /**
  * Transcribes and checks episodes for ads one window at a time. Transcripts
@@ -142,11 +142,17 @@ async function transcribeWindow(
       const audio = await extractWindow(url, start, WINDOW_SECONDS, taskSignal);
       const { segments, audioSeconds } = await transcribe(audio, start, WINDOW_SECONDS, language, config, taskSignal);
       const db = await getDb();
-      await db.execute({
-        sql: `INSERT OR REPLACE INTO analysis_window (url_key, start, url, segments, created_at) VALUES (?, ?, ?, ?, ?)`,
-        args: [urlKey, start, url, JSON.stringify(segments), Date.now()],
-      });
-      await addUsage(userId, { audioSeconds });
+      // One transaction: the transcript is only kept with the usage it cost.
+      await db.batch(
+        [
+          {
+            sql: `INSERT OR REPLACE INTO analysis_window (url_key, start, url, segments, created_at) VALUES (?, ?, ?, ?, ?)`,
+            args: [urlKey, start, url, JSON.stringify(segments), Date.now()],
+          },
+          usageStatement(userId, { audioSeconds }),
+        ],
+        "write",
+      );
       return segments;
     },
     signal,
@@ -173,13 +179,19 @@ async function classifyWindow(
       const context = (await storedSegments(urlKey, start - WINDOW_SECONDS)) ?? [];
       const result = await detectAds(segments, context, episode, config, taskSignal);
       const db = await getDb();
-      await db.execute({
-        sql: `INSERT OR REPLACE INTO analysis_verdict (url_key, start, detector, ads, created_at) VALUES (?, ?, ?, ?, ?)`,
-        args: [urlKey, start, detector, JSON.stringify(result.ads), Date.now()],
-      });
-      if (segments.length > 0) {
-        await addUsage(userId, { detectCalls: 1, inputTokens: result.inputTokens, outputTokens: result.outputTokens });
-      }
+      await db.batch(
+        [
+          {
+            sql: `INSERT OR REPLACE INTO analysis_verdict (url_key, start, detector, ads, created_at) VALUES (?, ?, ?, ?, ?)`,
+            args: [urlKey, start, detector, JSON.stringify(result.ads), Date.now()],
+          },
+          // An empty window never reaches the detector, so costs nothing.
+          ...(segments.length > 0
+            ? [usageStatement(userId, { detectCalls: 1, inputTokens: result.inputTokens, outputTokens: result.outputTokens })]
+            : []),
+        ],
+        "write",
+      );
     },
     signal,
   );
