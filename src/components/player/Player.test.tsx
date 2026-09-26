@@ -21,6 +21,10 @@ const ad = (start: number, end: number): AdRange => ({ start, end, confidence: 0
 
 let paused = true;
 let audio: HTMLAudioElement;
+let resolveCalls: Array<{ url: string; fresh?: boolean }> = [];
+/** What /api/resolve pins; changes when a stale link is re-pinned. */
+let pinned = SOURCE;
+const mediaHandlers = new Map<string, (details: MediaSessionActionDetails) => void>();
 
 beforeEach(async () => {
   paused = true;
@@ -32,10 +36,21 @@ beforeEach(async () => {
     paused = false;
   });
   Object.defineProperty(HTMLMediaElement.prototype, "paused", { get: () => paused, configurable: true });
+  resolveCalls = [];
+  pinned = SOURCE;
+  mediaHandlers.clear();
+  Object.defineProperty(navigator, "mediaSession", {
+    configurable: true,
+    value: { metadata: null, playbackState: "none", setActionHandler: (action: string, handler: never) => mediaHandlers.set(action, handler) },
+  });
+  vi.stubGlobal("MediaMetadata", class { constructor(readonly init: object) {} });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
-      if (String(input).startsWith("/api/resolve")) return Response.json({ url: SOURCE });
+      if (String(input).startsWith("/api/resolve")) {
+        resolveCalls.push(JSON.parse(String(init.body)));
+        return Response.json({ url: pinned });
+      }
       if (init.method === "POST") return new Promise<Response>(() => {}); // analysis stays in flight
       return Response.json({ windows: [], segments: [], ads: [] });
     }),
@@ -148,5 +163,43 @@ describe("auto-skip", () => {
     expect(paused).toBe(true);
     act(() => vi.advanceTimersByTime(15_000));
     expect(paused).toBe(false);
+  });
+});
+
+describe("loading", () => {
+  it("re-pins a stale audio link once, and picks up where it was", async () => {
+    playTo(42);
+    pinned = "https://cdn.example/pinned-again/ep.mp3";
+    await act(async () => {
+      fireEvent.error(audio);
+    });
+    expect(resolveCalls.at(-1)).toEqual({ url: episode.audioUrl, fresh: true });
+    expect(audio.getAttribute("src")).toBe("https://cdn.example/pinned-again/ep.mp3");
+    act(() => {
+      fireEvent.loadedMetadata(audio);
+    });
+    expect(audio.currentTime).toBe(42);
+    expect(usePlayback.getState().error).toBeNull();
+
+    // A second failure is reported, not retried forever.
+    await act(async () => {
+      fireEvent.error(audio);
+    });
+    expect(resolveCalls.filter((c) => c.fresh)).toHaveLength(1);
+    expect(usePlayback.getState().error).toMatch(/couldn't be loaded/);
+  });
+});
+
+describe("media keys", () => {
+  it("pauses on pause and plays on play, whatever the current state", () => {
+    paused = true;
+    act(() => mediaHandlers.get("pause")!({ action: "pause" }));
+    expect(paused).toBe(true);
+    act(() => mediaHandlers.get("play")!({ action: "play" }));
+    expect(paused).toBe(false);
+    act(() => mediaHandlers.get("play")!({ action: "play" }));
+    expect(paused).toBe(false);
+    act(() => mediaHandlers.get("pause")!({ action: "pause" }));
+    expect(paused).toBe(true);
   });
 });

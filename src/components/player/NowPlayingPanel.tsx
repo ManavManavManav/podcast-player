@@ -113,7 +113,7 @@ function Transcript() {
     return (
       <div className="grid flex-1 place-items-center p-10 text-center text-sm text-muted">
         <div className="flex items-center gap-2">
-          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Transcribing the first minute…
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Transcribing…
         </div>
       </div>
     );
@@ -129,7 +129,7 @@ function Transcript() {
       >
         {segments.map((segment, i) => (
           <TranscriptLine
-            key={segment.start}
+            key={`${segment.start}-${segment.end}`}
             index={i}
             segment={segment}
             active={i === activeIndex}
@@ -210,7 +210,7 @@ function AdList() {
             .join(" ");
           const status = currentTime >= ad.end ? "Passed" : currentTime >= ad.start ? "Playing" : "Upcoming";
           return (
-            <li key={ad.start}>
+            <li key={`${ad.start}-${ad.end}`}>
               <button
                 onClick={() => seek(ad.start)}
                 className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-2xl bg-ad-soft px-4 py-3.5 text-left"

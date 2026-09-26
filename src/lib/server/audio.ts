@@ -201,10 +201,11 @@ const resolved = (globalThis as unknown as { __podblockResolved?: Map<string, { 
  * analyzer both use it: that way the ads found are the ads being heard.
  * Falls back to the original URL if the host doesn't cooperate.
  */
-export async function resolveAudioUrl(url: string): Promise<string> {
+export async function resolveAudioUrl(url: string, { fresh = false }: { fresh?: boolean } = {}): Promise<string> {
   if (!isHttpUrl(url)) throw new Error("Audio URL must be http(s)");
   const hit = resolved.get(url);
-  if (hit && Date.now() - hit.at < RESOLVE_TTL_MS) return hit.url;
+  // `fresh`: the remembered link stopped working (e.g. a signed URL expired).
+  if (!fresh && hit && Date.now() - hit.at < RESOLVE_TTL_MS) return hit.url;
 
   let final = url;
   try {

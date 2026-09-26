@@ -219,6 +219,13 @@ describe("resolveAudioUrl", () => {
     expect(requests.length).toBe(before);
   });
 
+  it("can skip the remembered answer when asked for a fresh one", async () => {
+    await resolveAudioUrl(`${base}/redirect?e=1`);
+    const before = requests.length;
+    expect(await resolveAudioUrl(`${base}/redirect?e=1`, { fresh: true })).toBe(`${base}/episode.mp3`);
+    expect(requests.length).toBeGreaterThan(before);
+  });
+
   it("never requests a host that isn't public", async () => {
     guard.allow = () => false;
     expect(await resolveAudioUrl(`${base}/redirect?d=1`)).toBe(`${base}/redirect?d=1`);

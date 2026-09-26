@@ -63,4 +63,11 @@ describe("POST /api/resolve", () => {
     mocks.isPublicUrl.mockImplementation(async (url: string) => url === AUDIO);
     expect(await (await post({ url: AUDIO })).json()).toEqual({ url: AUDIO });
   });
+
+  it("asks for a fresh answer when the player's pinned link went stale", async () => {
+    await post({ url: AUDIO, fresh: true });
+    expect(mocks.resolveAudioUrl).toHaveBeenCalledWith(AUDIO, { fresh: true });
+    await post({ url: AUDIO });
+    expect(mocks.resolveAudioUrl).toHaveBeenLastCalledWith(AUDIO, { fresh: false });
+  });
 });
