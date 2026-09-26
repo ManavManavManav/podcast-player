@@ -1,4 +1,5 @@
 import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
+import { AppError } from "@/lib/server/errors";
 
 /** Instructions and parsing shared by every LLM ad classifier. */
 
@@ -78,13 +79,13 @@ export function formatTranscript(
 export function parseAds(text: string, window: TranscriptSegment[]): AdRange[] {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start === -1 || end <= start) throw new Error("The model didn't return JSON");
+  if (start === -1 || end <= start) throw new AppError("detection", "The model didn't return JSON");
 
   let parsed: { ads?: Array<{ start: unknown; end: unknown; advertiser?: unknown }> };
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch {
-    throw new Error("The model returned malformed JSON");
+    throw new AppError("detection", "The model returned malformed JSON");
   }
 
   const windowStart = window[0].start;

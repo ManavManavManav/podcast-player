@@ -1,3 +1,4 @@
+import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { approveUser, listUsers } from "@/lib/server/admin";
@@ -55,7 +56,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message || "That didn't work" }, { status: 500 });
+    // Better Auth's own refusals are written for people; anything else stays in the log.
+    if (err instanceof APIError) {
+      return NextResponse.json({ error: err.message || "That didn't work" }, { status: err.statusCode });
+    }
+    console.error(`[podblock] admin ${action} failed:`, err);
+    return NextResponse.json({ error: "That didn't work. Try again, or check the server log." }, { status: 500 });
   }
   return NextResponse.json(await listUsers());
 }

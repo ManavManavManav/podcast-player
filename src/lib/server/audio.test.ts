@@ -16,6 +16,7 @@ vi.mock("@/lib/server/guard", async (importOriginal) => ({
 }));
 
 const { extractWindow, ffmpegPath, resolveAudioUrl } = await import("@/lib/server/audio");
+const { AppError } = await import("@/lib/server/errors");
 
 const FIXTURE_SECONDS = 20;
 let dir: string;
@@ -117,6 +118,17 @@ describe("extractWindow", () => {
 
   it("fails when the file doesn't exist", async () => {
     await expect(extractWindow(`${base}/missing.mp3`, 0, 5)).rejects.toThrow(/ffmpeg failed|No audio/);
+  });
+
+  it("marks its failures as audio errors, but not aborts", async () => {
+    const failed = await extractWindow(`${base}/missing.mp3`, 0, 5).catch((e) => e);
+    expect(failed).toBeInstanceOf(AppError);
+    expect(failed.kind).toBe("audio");
+
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    const aborted = await extractWindow(`${base}/stall.mp3`, 0, 5, controller.signal).catch((e) => e);
+    expect(aborted.name).toBe("AbortError");
   });
 
   it("refuses non-http(s) URLs", async () => {

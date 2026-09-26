@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { WINDOW_SECONDS, whisperLanguage } from "@/lib/analysis";
 import { analyzeWindow, cachedAnalysis } from "@/lib/server/analyzer";
+import { publicError } from "@/lib/server/errors";
 import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 import { requireUser } from "@/lib/server/session";
@@ -86,7 +87,9 @@ export async function POST(req: NextRequest) {
       // The player moved on; nobody is listening for this response.
       return new NextResponse(null, { status: 499 });
     }
-    console.error("[podblock] analysis failed:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 502 });
+    // Full details for the log; the listener gets a message meant for them.
+    console.error("[podblock] analysis failed:", error.message, error.cause ?? "");
+    const { status, body } = publicError(err);
+    return NextResponse.json(body, { status });
   }
 }

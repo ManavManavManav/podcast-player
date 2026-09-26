@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "@/lib/server/errors";
 import { detectAds } from "@/lib/server/llm/detect";
 
 const window = [
@@ -63,5 +64,18 @@ describe("detectAds", () => {
 
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ choices: [{ message: { content: null }, finish_reason: "length" }] })));
     await expect(detectAds(window, [], {}, config)).rejects.toThrow(/ran out of tokens/);
+  });
+
+  it("marks its failures as detection errors", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-a" };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "down" }, { status: 503 })));
+    const apiError = await detectAds(window, [], {}, config).catch((e) => e);
+    expect(apiError).toBeInstanceOf(AppError);
+    expect(apiError.kind).toBe("detection");
+
+    vi.stubGlobal("fetch", vi.fn(async () => answer("no json here")));
+    const parseError = await detectAds(window, [], {}, config).catch((e) => e);
+    expect(parseError).toBeInstanceOf(AppError);
+    expect(parseError.kind).toBe("detection");
   });
 });

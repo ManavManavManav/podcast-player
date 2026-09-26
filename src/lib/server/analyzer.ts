@@ -5,6 +5,7 @@ import type { AdRange, AnalyzeResponse, CachedAnalysis, EpisodeContext, Transcri
 import { extractWindow } from "@/lib/server/audio";
 import { detectConfig, transcribeConfig, type ApiConfig } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
+import { AppError } from "@/lib/server/errors";
 import { detectAds } from "@/lib/server/llm/detect";
 import { PROMPT_VERSION } from "@/lib/server/llm/prompt";
 import { transcribe } from "@/lib/server/transcribe";
@@ -133,7 +134,7 @@ async function transcribeWindow(
   if (cached) return cached;
 
   const config = transcribeConfig();
-  if (!config) throw new Error("Transcription isn't configured on this server (TRANSCRIBE_API_KEY)");
+  if (!config) throw new AppError("config", "Transcription isn't configured on this server (TRANSCRIBE_API_KEY)");
 
   return shared(
     `t:${urlKey}:${start}`,
@@ -200,7 +201,7 @@ export async function analyzeWindow(
   signal?: AbortSignal,
 ): Promise<AnalyzeResponse> {
   const config = detectConfig();
-  if (!config) throw new Error("Ad detection isn't configured on this server (DETECT_API_KEY)");
+  if (!config) throw new AppError("config", "Ad detection isn't configured on this server (DETECT_API_KEY)");
 
   const urlKey = keyFor(url);
   const detector = detectorKey(config);

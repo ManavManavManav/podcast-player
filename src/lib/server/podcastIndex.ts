@@ -104,6 +104,17 @@ interface RawEpisode {
   feedLanguage?: string;
 }
 
+/** Feed-supplied links are rendered as hrefs, so only http(s) ones are kept. */
+function webLink(value: string | undefined): string {
+  const link = value?.trim() ?? "";
+  try {
+    const { protocol } = new URL(link);
+    return protocol === "http:" || protocol === "https:" ? link : "";
+  } catch {
+    return "";
+  }
+}
+
 function toPodcast(feed: RawFeed): Podcast {
   return {
     id: feed.id,
@@ -114,7 +125,7 @@ function toPodcast(feed: RawFeed): Podcast {
     language: feed.language ?? "",
     categories: feed.categories ? Object.values(feed.categories) : [],
     episodeCount: feed.episodeCount ?? 0,
-    link: feed.link ?? "",
+    link: webLink(feed.link),
   };
 }
 

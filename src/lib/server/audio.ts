@@ -4,6 +4,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { AppError } from "@/lib/server/errors";
 import { fetchPublic } from "@/lib/server/safeFetch";
 
 const EXTRACT_TIMEOUT_MS = 90_000;
@@ -86,7 +87,7 @@ export async function extractWindow(
   duration: number,
   signal?: AbortSignal,
 ): Promise<Buffer> {
-  if (!isHttpUrl(url)) throw new Error("Audio URL must be http(s)");
+  if (!isHttpUrl(url)) throw new AppError("audio", "Audio URL must be http(s)");
   const controller = new AbortController();
   const stop = () => controller.abort();
   signal?.addEventListener("abort", stop, { once: true });
@@ -94,6 +95,9 @@ export async function extractWindow(
     return await withLoopbackProxy(url, controller.signal, (localUrl) =>
       runFfmpeg(localUrl, start, duration, controller.signal),
     );
+  } catch (err) {
+    if ((err as Error).name === "AbortError" || err instanceof AppError) throw err;
+    throw new AppError("audio", (err as Error).message, { cause: err });
   } finally {
     signal?.removeEventListener("abort", stop);
     controller.abort();

@@ -1,5 +1,6 @@
 import type { TranscriptSegment } from "@/lib/types";
 import type { ApiConfig } from "@/lib/server/config";
+import { AppError } from "@/lib/server/errors";
 
 /**
  * Speech-to-text through any OpenAI-compatible `/audio/transcriptions`
@@ -71,10 +72,10 @@ export async function transcribe(
   const body = (await res.json().catch(() => ({}))) as VerboseTranscription;
   if (!res.ok) {
     const message = typeof body.error === "string" ? body.error : body.error?.message;
-    throw new Error(`Transcription failed (${res.status}): ${message ?? res.statusText}`);
+    throw new AppError("transcription", `Transcription failed (${res.status}): ${message ?? res.statusText}`);
   }
   if (!Array.isArray(body.segments)) {
-    throw new Error("The transcription API didn't return timestamps (it needs to support verbose_json)");
+    throw new AppError("transcription", "The transcription API didn't return timestamps (it needs to support verbose_json)");
   }
   return {
     segments: parseTranscription(body, start, windowSeconds),
