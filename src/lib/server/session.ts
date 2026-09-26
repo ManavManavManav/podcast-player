@@ -14,8 +14,11 @@ export interface SessionUser {
 
 /** The signed-in user, or null. */
 export async function currentUser(): Promise<SessionUser | null> {
+  // Headers first: while prerendering at build time this marks the page
+  // dynamic before auth starts, so `next build` never opens the database.
+  const requestHeaders = await headers();
   const auth = await getAuth();
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await auth.api.getSession({ headers: requestHeaders });
   if (!session) return null;
   const { user } = session;
   const role = user.role === "admin" ? "admin" : "user";
