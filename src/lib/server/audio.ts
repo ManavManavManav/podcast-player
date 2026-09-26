@@ -4,7 +4,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
-import { isPublicUrl } from "@/lib/server/guard";
+import { fetchPublic } from "@/lib/server/safeFetch";
 
 const EXTRACT_TIMEOUT_MS = 90_000;
 /** Far more than a window of 16 kHz mono FLAC needs; stops a runaway stream. */
@@ -23,30 +23,16 @@ export function isHttpUrl(value: unknown): value is string {
   }
 }
 
-const MAX_REDIRECTS = 5;
 /** Response headers ffmpeg needs to seek with range requests. */
 const PASSED_HEADERS = ["content-type", "content-length", "content-range", "accept-ranges"];
-
-/** Fetches `url`, following redirects only to public hosts. */
-async function fetchPublic(url: string, headers: Record<string, string>, signal: AbortSignal): Promise<Response> {
-  let current = url;
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    if (!(await isPublicUrl(current))) throw new Error("Audio must be on a public host");
-    const res = await fetch(current, { headers, redirect: "manual", signal });
-    const location = res.headers.get("location");
-    if (res.status < 300 || res.status >= 400 || !location) return res;
-    await res.body?.cancel();
-    current = new URL(location, current).toString();
-  }
-  throw new Error("Too many redirects");
-}
 
 /**
  * Runs `work` with a loopback URL that proxies range requests to `url`.
  *
  * ffmpeg does its own seeking, but the static builds that run on Vercel
  * crash resolving hostnames. So Node does all the networking (DNS, TLS,
- * redirects, the public-host check) and ffmpeg only talks to 127.0.0.1.
+ * redirects, the public-address check at connect time) and ffmpeg only
+ * talks to 127.0.0.1.
  */
 async function withLoopbackProxy<T>(url: string, signal: AbortSignal, work: (localUrl: string) => Promise<T>): Promise<T> {
   const path = `/${randomUUID()}`;
@@ -62,7 +48,7 @@ async function withLoopbackProxy<T>(url: string, signal: AbortSignal, work: (loc
     try {
       const headers: Record<string, string> = { "User-Agent": "Podblock/1.0" };
       if (req.headers.range) headers.Range = req.headers.range;
-      const remote = await fetchPublic(url, headers, upstream.signal);
+      const { response: remote } = await fetchPublic(url, { headers, signal: upstream.signal });
       const passed = Object.fromEntries(
         PASSED_HEADERS.flatMap((name) => (remote.headers.has(name) ? [[name, remote.headers.get(name)!]] : [])),
       );
