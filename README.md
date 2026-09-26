@@ -85,17 +85,21 @@ See [`.env.example`](.env.example).
 | Variable | Default | |
 |---|---|---|
 | `PODCAST_INDEX_API_KEY`, `PODCAST_INDEX_API_SECRET` | none (required) | Podcast search and episode lists. `PODCAST_INDEX_API_SECRET_BASE64` also works. |
-| `BETTER_AUTH_SECRET` | none (required) | Signs sessions. `openssl rand -base64 48`. |
+| `BETTER_AUTH_SECRET` | none (required) | Signs sessions; at least 32 characters. `openssl rand -base64 48`. In production the server won't serve requests without a valid one. |
+| `BETTER_AUTH_URL` | the request's host | The site's public address, e.g. `https://podblock.example.com`. Set it in production. |
 | `PODBLOCK_ADMIN_EMAIL` | none (required) | The account that becomes the admin. |
 | `TRANSCRIBE_API_KEY` | none (required) | Speech-to-text key. |
 | `TRANSCRIBE_BASE_URL`, `TRANSCRIBE_MODEL` | Groq, `whisper-large-v3-turbo` | Any OpenAI-compatible `/audio/transcriptions` API that returns segment timestamps (`verbose_json`), e.g. DeepInfra: `https://api.deepinfra.com/v1/openai`, `openai/whisper-large-v3-turbo`. |
 | `DETECT_API_KEY` | none (required) | Ad-detection key. |
-| `DETECT_BASE_URL`, `DETECT_MODEL` | Xiaomi MiMo, `mimo-v2.6-pro` | Any OpenAI-compatible `/chat/completions` API. `mimo-v2.6-flash` is cheaper. |
+| `DETECT_BASE_URL`, `DETECT_MODEL` | Xiaomi MiMo, `mimo-v2.6-pro` | Any OpenAI-compatible `/chat/completions` API. `mimo-v2.6-flash` is cheaper. Changing the model re-runs detection for episodes listened to afterwards. |
 | `DATABASE_URL`, `DATABASE_AUTH_TOKEN` | local file `.data/podblock.db` | A libSQL/Turso database. Required on Vercel. |
-| `PODBLOCK_TRUSTED_ORIGINS` | not set | Extra addresses the site is reached at, comma-separated, so sign-in works from them. |
-| `GITHUB_CLIENT_ID/SECRET`, `GOOGLE_CLIENT_ID/SECRET` | not set | Optional social sign-in. |
-| `FFMPEG_PATH` | bundled | Use a different ffmpeg. |
 | `PODBLOCK_DATA_DIR` | `.data` | Where the local database file lives when `DATABASE_URL` isn't set. |
+| `PODBLOCK_TRUSTED_ORIGINS` | not set | Extra addresses the site is reached at, comma-separated, so sign-in works from them. |
+| `PODBLOCK_LOG_LEVEL` | `info` | Server log level (`debug`, `info`, `warn`, `error`, `silent`). Logs are one JSON object per line. |
+| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | not set | Optional social sign-in; both halves of a pair are needed. |
+| `FFMPEG_PATH` | bundled | Use a different ffmpeg. |
+
+Development and testing only: `DEV_ALLOWED_ORIGINS` (hostnames `next dev` is opened from), `PODCAST_INDEX_BASE_URL` and `PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS` (for the fake providers; see [Development](#development)). `npm run doctor` checks all of these with the same rules the server applies at startup.
 
 ## Keyboard shortcuts
 
@@ -139,11 +143,17 @@ scripts/doctor.mjs          Setup checker
 ## Development
 
 ```bash
-npm run dev         # development server
-npm run check       # typecheck + lint + tests
-npm test            # unit tests (Vitest)
-npm run build       # production build
+npm run dev             # development server
+npm run check           # typecheck + lint + unit tests
+npm test                # unit and integration tests (Vitest)
+npm run test:coverage   # the same, with a coverage report in coverage/
+npm run build           # production build
+npm run test:e2e        # end-to-end tests in Chromium, after a build
+npm run fake-providers  # stand-ins for every external API, for offline work
+npm run doctor          # checks your setup
 ```
+
+The end-to-end tests start the production build against `scripts/fake-providers.mjs` (a fake Podcast Index, transcription and detection API, and podcast host) with a throwaway database, so they need no keys or network. The first run needs a browser: `npx playwright install chromium`. CI (`.github/workflows/ci.yml`) runs the checks, the build and the end-to-end tests on every push and pull request.
 
 ## Limitations
 

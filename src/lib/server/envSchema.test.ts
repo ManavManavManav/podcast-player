@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkEnv, ENV_VARS } from "@/lib/server/envSchema.mjs";
 
@@ -101,5 +103,22 @@ describe("ENV_VARS", () => {
     const names = ENV_VARS.map((v) => v.name);
     expect(new Set(names).size).toBe(names.length);
     for (const v of ENV_VARS) expect(v.description.length).toBeGreaterThan(10);
+  });
+});
+
+describe("documentation", () => {
+  const read = (file: string) => fs.readFileSync(path.resolve(file), "utf-8");
+
+  it("lists every setting in .env.example", () => {
+    const example = read(".env.example");
+    const missing = ENV_VARS.filter((v) => !new RegExp(`^#? ?${v.name}=`, "m").test(example)).map((v) => v.name);
+    expect(missing).toEqual([]);
+  });
+
+  it("describes every non-development setting in the README's configuration table", () => {
+    const readme = read("README.md");
+    const table = readme.slice(readme.indexOf("## Configuration"), readme.indexOf("## Keyboard shortcuts"));
+    const missing = ENV_VARS.filter((v) => v.group !== "development" && !table.includes(v.name)).map((v) => v.name);
+    expect(missing).toEqual([]);
   });
 });
