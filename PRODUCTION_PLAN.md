@@ -4,6 +4,14 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 
 ---
 
+## Status (2026-09-26, branch `production-hardening`)
+
+- **Done: 38 work items**, each its own commit with tests written first (characterization tests before changing uncovered code). The unit/integration suite went from 30 tests (8.8% line coverage) to 317 passing tests, plus 3 Playwright end-to-end journeys. See the notes under each item in §3.
+- **Blocked on your decisions: 10 items**. 7 (Q3), 11 (Q8), 12 (Q9), 13 (Q4), 33 (Q6), 40 (Q5), 42–43 (Q1), 44 (Q10), 45b (Q11). New **Q14** came from the seek measurements (#21).
+- **Not yet verified on GitHub:** nothing has been pushed, so the CI workflow, Dependabot config and the Node 22/24 matrix have only been checked locally (same commands, and a fresh clone).
+- **Your running `next dev` (:3001)** picks up these changes as files change. On its next restart it will: send the new security headers; run the schema migration (verified on a copy of your database: all data kept, the empty `user_settings` table dropped, `rateLimit` added); and log JSON lines.
+- **GitHub private vulnerability reporting is off** for the repo; `SECURITY.md` works either way.
+
 ## 0. What I ran
 
 | Check | Result |
@@ -307,7 +315,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
 ### Phase 8: Docs
 45a. [x] **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG (X-1; split from #45).** *Verify:* a dry run on a fresh clone, following only CONTRIBUTING.md, gets to green `npm run check` and E2E.
    - *Done:* Added `docs/RUNBOOK.md` (health checks, the full log-event table, deploying + `npm run migrate`, accounts, key rotation effects, re-analysing an episode, backups, a symptom → log-event table), `SECURITY.md` (reporting, protections, known limitations), `CONTRIBUTING.md` (setup, tests, conventions: tests first, env vars, append-only migrations, `log`, `AppError`, `PROMPT_VERSION`) and `CHANGELOG.md` (Unreleased: this branch). The README project layout was updated. **Runbook commands were run, not just written:** the `VACUUM INTO` backup (verbatim, quoting included) and the re-analyse `DELETE` (3 verdicts matched and deleted), both on a copy of your real DB. **Dry run on a fresh clone, following CONTRIBUTING.md only:** `npm ci` → `npm run check` (317 passed) → `npx playwright install chromium` → `npm run build` → `npm run test:e2e` (3 passed); then the fake-providers + `npm run dev` path (doctor all ✓; healthz, readyz and /login 200). Learned from the dry run: port 3000 was taken on this machine and Next silently moved to another port, so CONTRIBUTING now says to open the address it prints. **For you:** GitHub private vulnerability reporting is **disabled** on the repo (checked via the API). SECURITY.md is worded to work either way; enabling it is a repo setting I didn't change.
-45b. **LICENSE (Q11).**
+45b. [blocked] **LICENSE (Q11).**
+   - *Blocked:* Q11 (which license, or make the repo private).
 
 ---
 
