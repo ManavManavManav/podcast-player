@@ -88,6 +88,8 @@ export async function extractWindow(
   signal?: AbortSignal,
 ): Promise<Buffer> {
   if (!isHttpUrl(url)) throw new AppError("audio", "Audio URL must be http(s)");
+  // A listener added to an already-aborted signal would never fire.
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const controller = new AbortController();
   const stop = () => controller.abort();
   signal?.addEventListener("abort", stop, { once: true });

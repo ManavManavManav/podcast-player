@@ -145,3 +145,47 @@ describe("storage consistency", () => {
     expect(Number(verdicts.rows[0].n)).toBe(0);
   });
 });
+
+describe("shared work", () => {
+  it("runs a window once for listeners asking at the same time", async () => {
+    const url = "https://cdn.example.com/shared.mp3";
+    const [a, b] = await Promise.all([analyzeWindow(url, 0, "en", {}, "u-a"), analyzeWindow(url, 0, "en", {}, "u-b")]);
+    expect(a.segments).toEqual(b.segments);
+    expect(steps.extractWindow).toHaveBeenCalledTimes(1);
+    expect(steps.detectAds).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps going for the others when one listener leaves", async () => {
+    const url = "https://cdn.example.com/shared-leave.mp3";
+    let finish!: () => void;
+    steps.extractWindow.mockImplementationOnce(() => new Promise((resolve) => (finish = () => resolve(Buffer.from("flac")))));
+    const leaving = new AbortController();
+    const first = analyzeWindow(url, 0, "en", {}, "u-a", leaving.signal).catch((e) => e);
+    const second = analyzeWindow(url, 0, "en", {}, "u-b");
+    await vi.waitFor(() => expect(steps.extractWindow).toHaveBeenCalledTimes(1));
+    leaving.abort();
+    finish();
+    expect((await first).name).toBe("AbortError");
+    expect((await second).segments).toEqual(segmentsAt(0));
+  });
+
+  it("starts fresh work for a listener who arrives while cancelled work is still winding down (E-4)", async () => {
+    const url = "https://cdn.example.com/shared-race.mp3";
+    // Like ffmpeg: after an abort it takes a moment to actually stop.
+    steps.extractWindow.mockImplementationOnce(
+      (_url: string, _start: number, _duration: number, signal: AbortSignal) =>
+        new Promise((_, reject) =>
+          signal.addEventListener("abort", () => setTimeout(() => reject(new DOMException("Aborted", "AbortError")), 50)),
+        ),
+    );
+    const leaving = new AbortController();
+    const first = analyzeWindow(url, 0, "en", {}, "u-a", leaving.signal).catch((e) => e);
+    await vi.waitFor(() => expect(steps.extractWindow).toHaveBeenCalledTimes(1));
+    leaving.abort();
+
+    const second = await analyzeWindow(url, 0, "en", {}, "u-b");
+    expect(second.segments).toEqual(segmentsAt(0));
+    expect(steps.extractWindow).toHaveBeenCalledTimes(2);
+    expect((await first).name).toBe("AbortError");
+  });
+});

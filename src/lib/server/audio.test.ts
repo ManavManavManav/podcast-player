@@ -141,8 +141,7 @@ describe("extractWindow", () => {
     await expect(extractWindow(`${base}/stall.mp3`, 0, 5, controller.signal)).rejects.toThrow(/abort/i);
   });
 
-  // Known bug: a listener added to an already-aborted signal never fires.
-  it.fails("refuses to start with an already-aborted signal", async () => {
+  it("refuses to start with an already-aborted signal", async () => {
     const controller = new AbortController();
     controller.abort();
     await expect(extractWindow(`${base}/episode.mp3`, 0, 5, controller.signal)).rejects.toThrow(/abort/i);

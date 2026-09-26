@@ -41,6 +41,11 @@ class SharedTask<T> {
     this.promise = run(this.controller.signal);
   }
 
+  /** Cancelled, though possibly still winding down: not worth joining. */
+  get cancelled(): boolean {
+    return this.controller.signal.aborted;
+  }
+
   wait(signal?: AbortSignal): Promise<T> {
     this.waiters++;
     return new Promise<T>((resolve, reject) => {
@@ -75,10 +80,16 @@ const inflight = ((globalThis as unknown as { __podblockInflight?: Map<string, S
 /** Runs `work` once per key at a time; concurrent callers share the result. */
 function shared<T>(key: string, work: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
   let task = inflight.get(key) as SharedTask<T> | undefined;
-  if (!task) {
-    task = new SharedTask(work);
-    inflight.set(key, task as SharedTask<unknown>);
-    task.promise.catch(() => {}).finally(() => inflight.delete(key));
+  if (!task || task.cancelled) {
+    const created = new SharedTask(work);
+    task = created;
+    inflight.set(key, created as SharedTask<unknown>);
+    // Only remove this task's entry: a replacement may have taken the key.
+    created.promise
+      .catch(() => {})
+      .finally(() => {
+        if (inflight.get(key) === created) inflight.delete(key);
+      });
   }
   return task.wait(signal);
 }
