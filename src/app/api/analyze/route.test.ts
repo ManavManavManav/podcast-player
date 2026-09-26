@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
@@ -14,17 +14,27 @@ vi.mock("@/lib/server/guard", async (importOriginal) => ({
   isPublicUrl: mocks.isPublicUrl,
 }));
 
-const { GET, POST } = await import("@/app/api/analyze/route");
+const { GET, POST, maxDuration } = await import("@/app/api/analyze/route");
 const { AppError } = await import("@/lib/server/errors");
 
 const AUDIO = "https://cdn.example.com/ep1.mp3";
 const user = { id: "u1", name: "U", email: "u@example.com", role: "user", approved: true };
 
-function post(body: unknown, headers: Record<string, string> = {}) {
+function post(body: unknown, headers: Record<string, string> = {}, signal?: AbortSignal) {
   return new NextRequest("http://localhost:3000/api/analyze", {
     method: "POST",
     headers: { host: "localhost:3000", "content-type": "application/json", origin: "http://localhost:3000", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
+    signal,
+  });
+}
+
+/** Like the analyzer: runs until its signal aborts, then rejects the way SharedTask does. */
+function untilAborted(_url: string, _w: number, _l: unknown, _e: unknown, _u: string, signal: AbortSignal) {
+  return new Promise((_, reject) => {
+    const abort = () => reject(new DOMException("Aborted", "AbortError"));
+    if (signal.aborted) return abort();
+    signal.addEventListener("abort", abort, { once: true });
   });
 }
 
@@ -84,9 +94,11 @@ describe("POST /api/analyze: requests", () => {
   });
 
   it("answers 499 with no body when the client went away", async () => {
-    mocks.analyzeWindow.mockRejectedValue(new DOMException("Aborted", "AbortError"));
-    const res = await POST(post({ url: AUDIO, window: 0 }));
-    expect(res.status).toBe(499);
+    mocks.analyzeWindow.mockImplementation(untilAborted);
+    const client = new AbortController();
+    const pending = POST(post({ url: AUDIO, window: 0 }, {}, client.signal));
+    client.abort();
+    expect((await pending).status).toBe(499);
   });
 });
 
@@ -118,6 +130,39 @@ describe("POST /api/analyze: failures", () => {
     const body = await res.json();
     expect(body.code).toBe("config");
     expect(body.error).not.toMatch(/DETECT_API_KEY/);
+  });
+});
+
+describe("POST /api/analyze: time limit", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("gives up before the platform's limit, and says when to retry", async () => {
+    vi.useFakeTimers();
+    mocks.analyzeWindow.mockImplementation(untilAborted);
+    const pending = POST(post({ url: AUDIO, window: 0 }));
+    await vi.advanceTimersByTimeAsync((maxDuration - 10) * 1000);
+    const res = await pending;
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toMatch(/^\d+$/);
+    expect((await res.json()).code).toBe("timeout");
+  });
+
+  it("doesn't cut off work that finishes in time", async () => {
+    vi.useFakeTimers();
+    mocks.analyzeWindow.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve({ window: 0, segments: [], ads: [], cached: false }), 60_000)),
+    );
+    const pending = POST(post({ url: AUDIO, window: 0 }));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect((await pending).status).toBe(200);
+  });
+
+  it("treats an abort nobody asked for as a temporary failure, not a departed client", async () => {
+    mocks.analyzeWindow.mockRejectedValue(new DOMException("Aborted", "AbortError"));
+    const res = await POST(post({ url: AUDIO, window: 0 }));
+    expect(res.status).toBe(503);
   });
 });
 
