@@ -35,8 +35,13 @@ describe("securityHeaders", () => {
     expect(header(dev, "Strict-Transport-Security")).toBeUndefined();
   });
 
+  it("enforces the content security policy", () => {
+    expect(header(prod, "Content-Security-Policy")).toBeTruthy();
+    expect(header(prod, "Content-Security-Policy-Report-Only")).toBeUndefined();
+  });
+
   it("has a content security policy that still lets the player work", () => {
-    const csp = directives(header(prod, "Content-Security-Policy-Report-Only") ?? header(prod, "Content-Security-Policy"));
+    const csp = directives(header(prod, "Content-Security-Policy"));
     expect(csp["default-src"]).toEqual(["'self'"]);
     expect(csp["frame-ancestors"]).toEqual(["'none'"]);
     expect(csp["object-src"]).toEqual(["'none'"]);
@@ -53,7 +58,7 @@ describe("securityHeaders", () => {
   });
 
   it("allows eval in development only", () => {
-    const csp = directives(header(dev, "Content-Security-Policy-Report-Only") ?? header(dev, "Content-Security-Policy"));
+    const csp = directives(header(dev, "Content-Security-Policy"));
     expect(csp["script-src"]).toContain("'unsafe-eval'");
   });
 });

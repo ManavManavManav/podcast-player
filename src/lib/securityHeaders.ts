@@ -23,8 +23,7 @@ export function securityHeaders({ dev }: { dev: boolean }): Array<{ key: string;
   ].join("; ");
 
   return [
-    // Report-only while it's checked against real use; see PRODUCTION_PLAN.md #9.
-    { key: "Content-Security-Policy-Report-Only", value: csp },
+    { key: "Content-Security-Policy", value: csp },
     { key: "X-Frame-Options", value: "DENY" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
