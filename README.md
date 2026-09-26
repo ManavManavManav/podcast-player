@@ -121,24 +121,44 @@ src/
     api/analyze/            Transcribe + detect one window; GET returns what's stored
     api/resolve/            Pin the ad-stitched variant of an episode
     api/health/             Setup check used by the in-app notice
+    api/healthz, readyz/    Uptime checks (no sign-in)
     api/auth/               Better Auth (sign-in, sign-up, sessions, admin)
     api/admin/users/        The admin's user list and actions
     (app)/                  Signed-in pages, incl. admin/; (auth)/ holds login, signup, pending
   components/               UI; player/ holds the player bar, timeline, panel; admin/ the Users page
   hooks/useAdScanner.ts     Keeps the current and next windows analyzed
   store/                    Zustand stores: player (persisted), analysis
+  instrumentation.ts        Startup configuration check; unhandled errors to the log
+  proxy.ts                  Sends signed-out visitors to sign in
   lib/
     analysis.ts             Window size and look-ahead
     ads/merge.ts            Merging ad ranges across windows
+    redirect.ts             Safe post-sign-in destinations
+    securityHeaders.ts      Security headers and content security policy
     server/analyzer.ts      Orchestration, storage, de-duplication, usage
     server/audio.ts         ffmpeg window extraction (via a loopback proxy), URL pinning
-    server/transcribe.ts    Speech-to-text client (+ tests)
-    server/llm/             Ad-detection client and its prompt (+ tests)
+    server/safeFetch.ts     Fetching user-supplied URLs, public addresses only
+    server/guard.ts         Public-address and cross-site checks
+    server/transcribe.ts    Speech-to-text client
+    server/llm/             Ad-detection client and its prompt
+    server/retry.ts         One retry for transient provider failures
     server/auth.ts          Better Auth setup, approval rules, admin bootstrap
-    server/db.ts            libSQL client and the app's tables
+    server/session.ts       The signed-in user, for pages and routes
+    server/db.ts            libSQL client
+    server/migrations.ts    The schema, versioned
+    server/envSchema.mjs    Every setting and its rules (shared with the doctor)
+    server/log.ts           Structured JSON logs
     server/podcastIndex.ts  Podcast Index client
-scripts/doctor.mjs          Setup checker
+e2e/                        Playwright end-to-end tests
+scripts/
+  doctor.mjs                Setup checker
+  migrate.ts                npm run migrate
+  fake-providers.mjs        Stand-ins for every external API
+  seek-accuracy.mjs         Measures window extraction accuracy and cost
+docs/                       RUNBOOK.md (operating a server), seek-accuracy.md
 ```
+
+Tests sit next to the code they test (`*.test.ts`, `*.test.tsx`).
 
 ## Development
 

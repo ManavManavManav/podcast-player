@@ -297,12 +297,16 @@ Each item is one commit. Security fixes come first, after CI so every later comm
 ### Phase 7: Build, packaging and repo hygiene
 41. [x] **Dependency automation + Node pinning (B-2).** *Verify:* the Dependabot config validates; CI uses `.nvmrc`.
    - *Done:* Added `.github/dependabot.yml`: weekly npm updates with minor and patch grouped into one PR, weekly GitHub Actions updates, and `@playwright/test` minor/major bumps excluded because its version must match the browser CI installs. `engines.node` goes `>=20.9` → **`>=22`** (Node 20 reached end-of-life in April 2026). The doctor and README match. I deliberately didn't use an exact `24.x` pin, because Vercel chooses its Node major from `engines` and `>=22` resolves to 24 as today. **Verified the floor rather than assuming it:** the full unit suite passes on Node 22.23.3 (317 passed), and CI's check job now runs a matrix of 22 and 24 (coverage uploaded from 24). The Dependabot config was only YAML-validated locally; GitHub validates it on push. No `packageManager` field: it would force corepack behaviour on contributors for no gain.
-42. **Self-host packaging (D-1) (Q1).** `output: "standalone"`, a Dockerfile and a compose example. *Verify:* `docker build` and `docker run`, then the E2E suite passes against the container.
-43. **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
-44. **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
+42. [blocked] **Self-host packaging (D-1) (Q1).** `output: "standalone"`, a Dockerfile and a compose example. *Verify:* `docker build` and `docker run`, then the E2E suite passes against the container.
+   - *Blocked:* Q1 (Vercel only, self-hosted, or both). The E2E suite from #30 is ready to validate a container.
+43. [blocked] **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
+   - *Blocked:* Q1. Also needs your Turso/Vercel accounts for per-environment databases. The backup and restore *procedure* is written up in the runbook (#45a).
+44. [blocked] **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
+   - *Blocked:* Q10 (production branch; commit AGENTS.md/CLAUDE.md; delete `.venv/` and the `TRANSCRIPTION`/`WASM` branches).
 
 ### Phase 8: Docs
-45. **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG, LICENSE (X-1) (Q11).** *Verify:* a new contributor can go from clone to green `npm run check` and E2E using only the docs (dry-run on a clean checkout).
+45a. **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG (X-1; split from #45).** *Verify:* a dry run on a fresh clone, following only CONTRIBUTING.md, gets to green `npm run check` and E2E.
+45b. **LICENSE (Q11).**
 
 ---
 
