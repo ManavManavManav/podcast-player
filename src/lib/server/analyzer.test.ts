@@ -213,3 +213,59 @@ describe("the end of the audio", () => {
     expect((await usageForMonth(currentMonth())).get("listener-end")?.audioSeconds).toBe(300);
   });
 });
+
+describe("what the README promises", () => {
+  it("redoes detection, not transcription, when the model changes", async () => {
+    const url = "https://cdn.example.com/model-change.mp3";
+    await analyzeWindow(url, 0, "en", {}, "u-model");
+    vi.clearAllMocks();
+    vi.stubEnv("DETECT_MODEL", "another-model");
+    const redone = await analyzeWindow(url, 0, "en", {}, "u-model");
+    expect(redone.cached).toBe(false);
+    expect(steps.extractWindow).not.toHaveBeenCalled();
+    expect(steps.transcribe).not.toHaveBeenCalled();
+    expect(steps.detectAds).toHaveBeenCalledTimes(1);
+    expect(steps.detectAds.mock.calls[0][3]).toMatchObject({ model: "another-model" });
+  });
+
+  it("gives the detector the previous window's transcript as context", async () => {
+    const url = "https://cdn.example.com/context.mp3";
+    await analyzeWindow(url, 0, "en", {}, "u-context");
+    await analyzeWindow(url, 300, "en", {}, "u-context");
+    const [windowSegments, context] = steps.detectAds.mock.calls[1];
+    expect(windowSegments).toEqual(segmentsAt(300));
+    expect(context).toEqual(segmentsAt(0));
+    // The first window has nothing before it.
+    expect(steps.detectAds.mock.calls[0][1]).toEqual([]);
+  });
+
+  it("keeps the transcript when detection fails, so a retry only redoes detection", async () => {
+    const url = "https://cdn.example.com/detect-fails.mp3";
+    steps.detectAds.mockRejectedValueOnce(new AppError("detection", "Ad detection failed (500): boom"));
+    await expect(analyzeWindow(url, 0, "en", {}, "u-retry")).rejects.toThrow(/boom/);
+    vi.clearAllMocks();
+    await analyzeWindow(url, 0, "en", {}, "u-retry");
+    expect(steps.transcribe).not.toHaveBeenCalled();
+    expect(steps.detectAds).toHaveBeenCalledTimes(1);
+    // Transcription was paid once, detection once (the failed call cost nothing recorded).
+    expect((await usageForMonth(currentMonth())).get("u-retry")).toMatchObject({ audioSeconds: 300, detectCalls: 1 });
+  });
+
+  it("stores nothing when transcription fails", async () => {
+    const url = "https://cdn.example.com/transcribe-fails.mp3";
+    steps.transcribe.mockRejectedValueOnce(new AppError("transcription", "Transcription failed (503): down"));
+    await expect(analyzeWindow(url, 0, "en", {}, "u-t")).rejects.toThrow(/down/);
+    expect(await cachedAnalysis(url)).toEqual({ windows: [], segments: [], ads: [] });
+    expect(steps.detectAds).not.toHaveBeenCalled();
+  });
+
+  it("merges an ad that spans a window boundary into one", async () => {
+    const url = "https://cdn.example.com/boundary.mp3";
+    steps.detectAds
+      .mockResolvedValueOnce({ ads: [{ start: 280, end: 300, confidence: 0.9, reason: "Ad: Acme" }], inputTokens: 1, outputTokens: 1 })
+      .mockResolvedValueOnce({ ads: [{ start: 300, end: 330, confidence: 0.9, reason: "Ad: Acme" }], inputTokens: 1, outputTokens: 1 });
+    await analyzeWindow(url, 0, "en", {}, "u-b");
+    const second = await analyzeWindow(url, 300, "en", {}, "u-b");
+    expect(second.ads).toEqual([{ start: 280, end: 330, confidence: 0.9, reason: "Ad: Acme" }]);
+  });
+});
