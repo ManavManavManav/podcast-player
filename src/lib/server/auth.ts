@@ -44,6 +44,10 @@ function buildOptions(db: Client) {
       minPasswordLength: 10,
     },
     socialProviders,
+    // On by default in production. Counts go in the database: the default
+    // in-memory store is per server instance, so on serverless hosts each
+    // instance would count sign-in attempts separately.
+    rateLimit: { storage: "database" },
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30 days
       updateAge: 60 * 60 * 24, // refresh daily while in use
