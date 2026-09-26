@@ -10,7 +10,20 @@ import { usePlayback, usePlayer } from "@/store/player";
 const CONCURRENCY = 2;
 /** After this many failures in a row, stop and surface the error. */
 const MAX_CONSECUTIVE_ERRORS = 3;
+/** First retry delay; it doubles with each failure in a row, unless the server says how long. */
 const RETRY_DELAY_MS = 8_000;
+
+/** A failed analysis request, with what the server said about it. */
+class AnalysisError extends Error {
+  constructor(
+    message: string,
+    /** The server's error code, e.g. "timeout" or "config". */
+    readonly code?: string,
+    readonly retryAfterMs?: number,
+  ) {
+    super(message);
+  }
+}
 
 /** What's playing, so the detector can tell the show's own plugs and topic from ads. */
 function currentEpisodeContext(): EpisodeContext {
@@ -111,7 +124,12 @@ export function useAdScanner(enabled: boolean) {
         .then(async (res) => {
           if (!res.ok) {
             const body = await res.json().catch(() => ({}));
-            throw new Error(body.error || `Analysis failed (${res.status})`);
+            const retryAfter = Number(res.headers.get("retry-after"));
+            throw new AnalysisError(
+              body.error || `Analysis failed (${res.status})`,
+              body.code,
+              retryAfter > 0 ? retryAfter * 1000 : undefined,
+            );
           }
           const body = (await res.json()) as AnalyzeResponse;
           if (!Array.isArray(body.segments) || !Array.isArray(body.ads)) {
@@ -128,17 +146,22 @@ export function useAdScanner(enabled: boolean) {
         .catch((err: Error) => {
           release();
           if (err.name === "AbortError" || useAnalysis.getState().url !== url) return;
-          failures.current += 1;
+          const { code, retryAfterMs } = err instanceof AnalysisError ? err : new AnalysisError(err.message);
           const analysis = useAnalysis.getState();
           analysis.setStatus(w, "error");
+          // Retrying can't fix a server that isn't set up.
+          if (code === "config") return analysis.setError(err.message);
+          // Running out of time under load isn't the service failing: keep at it.
+          if (code !== "timeout") failures.current += 1;
           if (failures.current >= MAX_CONSECUTIVE_ERRORS) {
             analysis.setError(err.message);
           } else {
             // Clear the error mark after a pause so the window is retried.
+            const delay = retryAfterMs ?? RETRY_DELAY_MS * 2 ** Math.max(0, failures.current - 1);
             const timer = setTimeout(() => {
               retryTimers.current.delete(timer);
               if (useAnalysis.getState().windows[w] === "error") useAnalysis.getState().clearStatus(w);
-            }, RETRY_DELAY_MS);
+            }, delay);
             retryTimers.current.add(timer);
           }
         });
