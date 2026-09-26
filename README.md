@@ -39,8 +39,8 @@ Open <http://localhost:3000>, **create your account first, with the admin email*
 ```
  Browser                                  Server (Next.js)                         APIs
 ┌──────────────────────────┐   POST    ┌──────────────────────────────┐
-│ <audio> plays the episode│/api/analyze  1. ffmpeg: 5 min of audio   │  range requests to the podcast host:
-│                          │ ────────▶ │     → 16 kHz FLAC            │  only that part is downloaded
+│ <audio> plays the episode│/api/analyze  1. ffmpeg: 5 min of audio   │  range requests to the podcast host
+│                          │ ────────▶ │     → 16 kHz FLAC            │  (see How it works, step 2)
 │ useAdScanner keeps the   │ window N  │  2. transcribe ─────────────────▶ Groq Whisper (timestamps)
 │ current and next 5-minute│           │  3. find ads ───────────────────▶ MiMo (JSON ad ranges)
 │ windows analyzed         │ ◀──────── │  4. store both in the database│
@@ -50,7 +50,7 @@ Open <http://localhost:3000>, **create your account first, with the admin email*
 ```
 
 1. **Pinning the audio.** Many hosts stitch ads into the file per request, so two downloads of "the same" episode can have different ads and different timings. Before playing, `/api/resolve` follows the episode's redirects to the concrete file being served. The player and the analyzer both use that exact URL, so the ads found are the ads you hear.
-2. **Listening ahead.** Episodes are analyzed in 5-minute windows on a fixed grid (0:00, 5:00, 10:00…), and the player keeps the current window and the next one done. ffmpeg seeks straight into the remote file, so only those bytes are downloaded. Node does the networking and hands ffmpeg a loopback URL, which also checks every redirect points at a public host.
+2. **Listening ahead.** Episodes are analyzed in 5-minute windows on a fixed grid (0:00, 5:00, 10:00…), and the player keeps the current window and the next one done. ffmpeg reads the window straight from the remote file with range requests. For M4A that means only the bytes around the window; for MP3, ffmpeg reads from the start of the file up to the window, which keeps timestamps exact but costs more later in long episodes (see [docs/seek-accuracy.md](docs/seek-accuracy.md)). Node does the networking and hands ffmpeg a loopback URL, which also checks every redirect points at a public host.
 3. **Transcribing.** Each window goes to the transcription API as 16 kHz mono FLAC (about 5 MB) and comes back as timestamped lines.
 4. **Finding ads.** The model reads the window's transcript, plus the end of the previous window for context, and returns each ad's start and end time. It's told what the show and episode are, so the episode's own subject and the show's own plugs aren't flagged. Reasoning is switched off and JSON output requested; for APIs that don't support those options, the request is retried without them.
 5. **Skipping.** When playback naturally enters an ad, the player jumps to its end and shows "Skipped a 51 sec ad · Undo". If you deliberately seek into an ad, it plays.
