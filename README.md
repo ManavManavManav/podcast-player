@@ -16,7 +16,7 @@ It runs anywhere Next.js does, including Vercel: transcription and ad detection 
 
 ## Quick start
 
-You need **Node.js 20.9+** and four sets of keys:
+You need **Node.js 22+** (CI uses 24; see `.nvmrc`) and four sets of keys:
 
 | For | Where | Cost |
 |---|---|---|

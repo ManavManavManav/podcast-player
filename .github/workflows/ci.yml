@@ -13,18 +13,22 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      matrix:
+        # The oldest Node the app supports (package.json engines) and the one it runs on (.nvmrc).
+        node: ["22", "24"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --no-fund
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:coverage
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && matrix.node == '24'
         with:
           name: coverage
           path: coverage/

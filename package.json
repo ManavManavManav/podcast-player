@@ -46,6 +46,6 @@
   },
   "description": "A podcast player that transcribes ahead of you and skips the ads.",
   "engines": {
-    "node": ">=20.9"
+    "node": ">=22"
   }
 }

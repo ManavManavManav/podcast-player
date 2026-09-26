@@ -20,8 +20,8 @@ function run(cmd, args) {
 }
 
 // Node
-const [major, minor] = process.versions.node.split(".").map(Number);
-check(major > 20 || (major === 20 && minor >= 9), `Node.js ${process.versions.node}`, "Install Node.js 20.9 or newer.");
+const [major] = process.versions.node.split(".").map(Number);
+check(major >= 22, `Node.js ${process.versions.node}`, "Install Node.js 22 or newer (24 is what CI uses; see .nvmrc).");
 
 // .env.local (Next.js loads it for the server; mirror that here)
 const envFile = path.join(process.cwd(), ".env.local");
