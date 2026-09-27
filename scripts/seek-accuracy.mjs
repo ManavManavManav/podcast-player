@@ -18,7 +18,7 @@ import path from "node:path";
 
 const require = createRequire(import.meta.url);
 const flagIndex = process.argv.indexOf("--ffmpeg");
-const ffmpeg = flagIndex > 0 ? process.argv[flagIndex + 1] : process.env.FFMPEG_PATH || require("@ffmpeg-installer/ffmpeg").path;
+const ffmpeg = flagIndex > 0 ? process.argv[flagIndex + 1] : process.env.FFMPEG_PATH || require("ffmpeg-static");
 
 const DURATION = 1200; // 20 minutes: long enough that reading from the start is visibly costly
 const BEEPS = [305, 905]; // seconds; windows start 5 s before each

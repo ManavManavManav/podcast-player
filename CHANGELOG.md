@@ -37,6 +37,7 @@ Production hardening; see `PRODUCTION_PLAN.md` for the full audit and the reason
 
 ### Changed
 
+- ffmpeg is now 7.0.2 from the maintained `ffmpeg-static` package, instead of a 2018 build.
 - Constant-bitrate MP3 and M4A windows are fetched by jumping to them (about 50× less downloaded late in an episode); variable-bitrate MP3 keeps the exact read.
 - Session checks mostly come from a 60-second signed cookie instead of the database.
 - A cached analysis request reads only the transcripts it needs.

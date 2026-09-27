@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -17,7 +18,10 @@ beforeAll(() => {
     "-af", "volume='if(lt(mod(t,4),2),1,0.02)':eval=frame", source,
   ]);
   const cover = path.join(dir, "cover.png");
-  execFileSync(ffmpegPath, ["-v", "error", "-f", "lavfi", "-i", "nullsrc=s=256x256,geq=random(1)*255:128:128", "-frames:v", "1", cover]);
+  // Random pixels don't compress: a cover bigger than the first 64 KB read.
+  const noise = path.join(dir, "noise.rgb");
+  fs.writeFileSync(noise, crypto.randomBytes(200 * 200 * 3));
+  execFileSync(ffmpegPath, ["-v", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "200x200", "-i", noise, "-frames:v", "1", cover]);
   const encode = (name: string, args: string[], extraInputs: string[] = []) => {
     const out = path.join(dir, name);
     execFileSync(ffmpegPath, ["-v", "error", "-i", source, ...extraInputs, ...args, out]);
@@ -58,7 +62,7 @@ describe("canFastSeek", () => {
   it("asks for more of the file when a tag (e.g. cover art) comes first", () => {
     const file = files["cbr-cover.mp3"];
     const tagSize = 10 + ((file[6] << 21) | (file[7] << 14) | (file[8] << 7) | file[9]);
-    expect(tagSize).toBeGreaterThan(50_000);
+    expect(tagSize).toBeGreaterThan(64 * 1024);
     expect(headBytesNeeded(file.subarray(0, 16))).toBeGreaterThan(tagSize);
   });
 });

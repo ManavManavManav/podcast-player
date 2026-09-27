@@ -32,7 +32,7 @@ const AD_LINES = [
 
 // --- The episode -------------------------------------------------------------------
 
-const ffmpeg = process.env.FFMPEG_PATH || require("@ffmpeg-installer/ffmpeg").path;
+const ffmpeg = process.env.FFMPEG_PATH || require("ffmpeg-static");
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "podblock-fake-"));
 const episodeFile = path.join(dir, "episode.mp3");
 execFileSync(ffmpeg, [

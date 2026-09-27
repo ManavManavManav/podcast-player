@@ -142,6 +142,14 @@ beforeEach(() => {
   guard.allow = () => true;
 });
 
+describe("the bundled ffmpeg", () => {
+  it("is a maintained release (7 or newer), not the 2018 build", () => {
+    const banner = execFileSync(ffmpegPath, ["-version"]).toString().split("\n")[0];
+    const major = Number(banner.match(/ffmpeg version (\d+)\./)?.[1]);
+    expect(major, banner).toBeGreaterThanOrEqual(7);
+  });
+});
+
 describe("extractWindow", () => {
   it("extracts the window as 16 kHz mono FLAC", async () => {
     const flac = await extractWindow(`${base}/episode.mp3`, 5, 5);

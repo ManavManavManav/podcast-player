@@ -19,5 +19,4 @@ Please report vulnerabilities privately rather than in a public issue: through G
 
 - **Session cache:** a disabled account can keep access for up to 60 seconds.
 - **Inline scripts:** the content security policy allows inline scripts (Next.js's hydration scripts are inline), so it limits but doesn't prevent script injection.
-- **Bundled ffmpeg** is a 2018 static build decoding files that users choose. A move to a maintained build is planned (S-7).
 - **Rate limiting behind a proxy** relies on `X-Forwarded-For`. Without it, all visitors share one limit.

@@ -37,7 +37,7 @@ if (existsSync(envFile)) {
 let ffmpegPath = env.FFMPEG_PATH;
 if (!ffmpegPath) {
   try {
-    ffmpegPath = createRequire(import.meta.url)("@ffmpeg-installer/ffmpeg").path;
+    ffmpegPath = createRequire(import.meta.url)("ffmpeg-static");
   } catch {
     ffmpegPath = null;
   }

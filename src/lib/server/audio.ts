@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import ffmpegStatic from "ffmpeg-static";
 import { canFastSeek, headBytesNeeded } from "@/lib/server/audioFormat";
 import { AppError } from "@/lib/server/errors";
 import { fetchPublic } from "@/lib/server/safeFetch";
@@ -12,8 +12,8 @@ const EXTRACT_TIMEOUT_MS = 90_000;
 /** Far more than a window of 16 kHz mono FLAC needs; stops a runaway stream. */
 const MAX_OUTPUT_BYTES = 24 * 1024 * 1024;
 
-/** FFMPEG_PATH if set, otherwise the static binary bundled with the app (so it runs on Vercel). */
-export const ffmpegPath = process.env.FFMPEG_PATH || ffmpegInstaller.path;
+/** FFMPEG_PATH if set, otherwise the static binary installed with the app (so it runs on Vercel). */
+export const ffmpegPath = process.env.FFMPEG_PATH || ffmpegStatic || "";
 
 export function isHttpUrl(value: unknown): value is string {
   if (typeof value !== "string") return false;
@@ -197,7 +197,8 @@ function runFfmpeg(input: string, start: number, duration: number, signal: Abort
   ];
 
   return new Promise<Buffer>((resolve, reject) => {
-    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    // The binary ships via outputFileTracingIncludes (next.config.ts); don't trace the spawn itself.
+    const ffmpeg = spawn(/*turbopackIgnore: true*/ ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
     const chunks: Buffer[] = [];
     let size = 0;
     let stderr = "";

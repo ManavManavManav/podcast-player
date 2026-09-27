@@ -4,7 +4,7 @@ How precisely, and how cheaply, the analyzer's ffmpeg call (`src/lib/server/audi
 
 **Method.** A 20-minute fixture: pink noise alternating loud and quiet every 10 s (so VBR bitrates vary), with 0.2 s beeps at 3 kHz at 305 s and 905 s. It is encoded six ways and served over HTTP with range support. A 10 s window starting 5 s before each beep is extracted with the app's own ffmpeg arguments, then decoded, and the beep is located (Goertzel, 10 ms frames). **Error** = where the beep lands minus 5 s. Positive means the window started early, so an ad would be reported later than it is heard. **Read** is ffmpeg's own count of bytes read for the later window.
 
-## Bundled ffmpeg (2018 static build, what the app runs today)
+## The previously bundled ffmpeg (2018 static build)
 
 | Encoding | File size | Seeking | Error at 305 s | Error at 905 s | Read for the later window | Requests |
 |---|---|---|---|---|---|---|
@@ -21,7 +21,7 @@ How precisely, and how cheaply, the analyzer's ffmpeg call (`src/lib/server/audi
 | M4A AAC, index last | 19.5 MB | default (current) | +0.00 s | +0.00 s | 383 KB | 4 |
 | M4A AAC, index last | 19.5 MB | fast (-fflags +fastseek) | +0.00 s | +0.00 s | 383 KB | 4 |
 
-## ffmpeg 7.0.2 (static build)
+## ffmpeg 7.0.2 (static build; what the app ships since #11, via `ffmpeg-static`)
 
 | Encoding | File size | Seeking | Error at 305 s | Error at 905 s | Read for the later window | Requests |
 |---|---|---|---|---|---|---|

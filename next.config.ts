@@ -9,10 +9,10 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: process.env.DEV_ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean),
   // Loaded from node_modules at runtime rather than bundled: the database
   // driver has native parts, and ffmpeg is a binary.
-  serverExternalPackages: ["@libsql/client", "@libsql/kysely-libsql", "@ffmpeg-installer/ffmpeg"],
+  serverExternalPackages: ["@libsql/client", "@libsql/kysely-libsql", "ffmpeg-static"],
   // Ship the static ffmpeg binary with the function that runs it (on Vercel).
   outputFileTracingIncludes: {
-    "/api/analyze": ["./node_modules/@ffmpeg-installer/linux-x64/**"],
+    "/api/analyze": ["./node_modules/ffmpeg-static/ffmpeg"],
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders({ dev: process.env.NODE_ENV === "development" }) }];
