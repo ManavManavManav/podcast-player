@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
-import { PRINCIPLES, principleFor } from "@/lib/field/principles";
-import { seedFor, startField } from "@/lib/field/renderer";
 import { formatClock } from "@/lib/text";
 import type { TranscriptSegment } from "@/lib/types";
 import { useAnalysis } from "@/store/analysis";
-import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, resolveFieldMode, usePlayback, usePlayer } from "@/store/player";
+import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
 
 /**
  * The Stage: a full-window Now Playing, where the Field draws at full
@@ -91,7 +89,6 @@ export function Stage({
         <Controls />
       </div>
 
-      <StageCanvas />
 
       <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 px-4 sm:bottom-20">
         <div className="pointer-events-auto">
@@ -107,27 +104,11 @@ export function Stage({
   );
 }
 
-/** The drawing, over everything, through a difference blend. */
-function StageCanvas() {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  useEffect(
-    () =>
-      startField(canvas.current!, "stage", () => {
-        const { episode, field, stageOpen } = usePlayer.getState();
-        return Boolean(episode) && stageOpen && resolveFieldMode(field) !== "off";
-      }),
-    [],
-  );
-  return <canvas ref={canvas} aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 size-full mix-blend-difference" />;
-}
-
 const word = "uppercase leading-none hover:line-through focus-visible:line-through";
 
 /** Settings along the top: ad skipping, speed, sleep, the drawing, transcript, close. */
 function TopWords({ close, closeButton }: { close: () => void; closeButton: React.RefObject<HTMLButtonElement | null> }) {
-  const { autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen, fieldStyle, setFieldStyle } = usePlayer();
-  const podcastId = usePlayer((s) => s.episode?.podcastId ?? 0);
-  const style = principleFor(seedFor(podcastId), fieldStyle);
+  const { autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen } = usePlayer();
   const nextRate = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]) + 1) % PLAYBACK_RATES.length];
   const sleepSteps = [15, 30, 60];
   const [now, setNow] = useState(() => Date.now());
@@ -155,13 +136,6 @@ function TopWords({ close, closeButton }: { close: () => void; closeButton: Reac
         }}
       >
         Sleep{sleepAt ? ` ${formatClock((sleepAt - now) / 1000)}` : ""}
-      </button>
-      <button
-        className={word}
-        onClick={() => setFieldStyle((PRINCIPLES.indexOf(style) + 1) % PRINCIPLES.length)}
-        aria-label={`Drawing: ${style}. Change it`}
-      >
-        {style}
       </button>
       <button className={word} onClick={() => setPanelOpen(!panelOpen)} aria-pressed={panelOpen}>
         Transcript

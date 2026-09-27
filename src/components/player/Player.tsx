@@ -30,7 +30,7 @@ import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { formatClock, formatDuration } from "@/lib/text";
 import type { AdRange } from "@/lib/types";
 import { adAt, useAnalysis } from "@/store/analysis";
-import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, resolveFieldMode, usePlayback, usePlayer } from "@/store/player";
+import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
 
 const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
 /** Don't bother skipping the last sliver of an ad. */
@@ -767,7 +767,7 @@ function useMediaSession() {
   }, [playing]);
 }
 
-/** Space/K play-pause, J/← back, L/→ forward, M mute, T transcript, S ad skipping, F Now Playing, V background. */
+/** Space/K play-pause, J/← back, L/→ forward, M mute, T transcript, S ad skipping, F Now Playing. */
 function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -804,9 +804,6 @@ function useKeyboardShortcuts() {
           break;
         case "f":
           player.setStageOpen(!player.stageOpen);
-          break;
-        case "v":
-          player.setField(resolveFieldMode(player.field) === "off" ? "auto" : "off");
           break;
         default:
           return;

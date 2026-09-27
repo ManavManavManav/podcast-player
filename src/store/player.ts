@@ -89,12 +89,6 @@ interface PlayerState {
    * fetching the feed again.
    */
   following: Record<string, Neighbours>;
-  /** Where the audio-reactive background shows. "auto": everywhere on desktop, only on the Stage on phones. */
-  field: FieldMode;
-  /** How strongly it draws, 0–1. */
-  fieldIntensity: number;
-  /** A drawing chosen on the Stage for this visit, instead of the show's own (index into PRINCIPLES). Not saved. */
-  fieldStyle: number | null;
   /** The full-window Now Playing view. Not saved: a reload starts on the page. */
   stageOpen: boolean;
 
@@ -115,21 +109,9 @@ interface PlayerState {
   savePosition: () => void;
   resumePoint: (episode: Episode) => number;
   setAutoNext: (on: boolean) => void;
-  setField: (mode: FieldMode) => void;
-  setFieldIntensity: (intensity: number) => void;
-  setFieldStyle: (style: number | null) => void;
   setStageOpen: (open: boolean) => void;
   /** The episode to play after `episode` ends, or null. */
   nextAfter: (episode: Episode) => Episode | null;
-}
-
-export type FieldMode = "auto" | "off" | "stage" | "everywhere";
-
-/** What "auto" means on this device: the full field on desktop, only on the Stage on phones (battery). */
-export function resolveFieldMode(mode: FieldMode): Exclude<FieldMode, "auto"> {
-  if (mode !== "auto") return mode;
-  if (typeof window === "undefined") return "stage";
-  return window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768 ? "everywhere" : "stage";
 }
 
 interface Neighbours {
@@ -170,9 +152,6 @@ export const usePlayer = create<PlayerState>()(
       stats: { adsSkipped: 0, secondsSaved: 0 },
       autoNext: true,
       following: {},
-      field: "auto",
-      fieldIntensity: 0.6,
-      fieldStyle: null,
       stageOpen: false,
 
       play: (episode, list) => {
@@ -246,9 +225,6 @@ export const usePlayer = create<PlayerState>()(
       },
 
       setAutoNext: (autoNext) => set({ autoNext }),
-      setField: (field) => set({ field }),
-      setFieldIntensity: (fieldIntensity) => set({ fieldIntensity: Math.min(1, Math.max(0, fieldIntensity)) }),
-      setFieldStyle: (fieldStyle) => set({ fieldStyle }),
       setStageOpen: (stageOpen) => set({ stageOpen }),
 
       nextAfter: (episode) => {
@@ -294,8 +270,6 @@ export const usePlayer = create<PlayerState>()(
         stats: s.stats,
         autoNext: s.autoNext,
         following: s.following,
-        field: s.field,
-        fieldIntensity: s.fieldIntensity,
       }),
     },
   ),
