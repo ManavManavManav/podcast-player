@@ -13,6 +13,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Lets the player bar sit clear of the iPhone home indicator (env(safe-area-inset-*)).
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f6f5f1" },
     { media: "(prefers-color-scheme: dark)", color: "#0c0c0b" },

@@ -281,6 +281,7 @@ export function Player({ userId }: { userId: string }) {
 
   useMediaSession();
   useKeyboardShortcuts();
+  const dock = usePlayerSpace(Boolean(episode));
 
   return (
     <>
@@ -348,7 +349,10 @@ export function Player({ userId }: { userId: string }) {
         }}
       />
       {episode && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-2 pb-2 sm:px-4 sm:pb-4">
+        <div
+          ref={dock}
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-[max(0.5rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
+        >
           <div className="pointer-events-auto">
             {notice && <SkipToast notice={notice} holding={holding} onUndo={undoSkip} onDismiss={dismissNotice} />}
             {panelOpen && <NowPlayingPanel />}
@@ -561,6 +565,29 @@ function VolumeControl() {
 }
 
 // --- System integration ---------------------------------------------------------------
+
+/**
+ * Publishes the docked player's height as --player-space, so the page can
+ * leave exactly enough room under its content.
+ */
+function usePlayerSpace(visible: boolean) {
+  const dock = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = document.documentElement.style;
+    const el = dock.current;
+    if (!visible || !el) {
+      root.removeProperty("--player-space");
+      return;
+    }
+    const observer = new ResizeObserver(() => root.setProperty("--player-space", `${Math.ceil(el.offsetHeight)}px`));
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.removeProperty("--player-space");
+    };
+  }, [visible]);
+  return dock;
+}
 
 /** Lock-screen / headphone / media-key controls. */
 function useMediaSession() {

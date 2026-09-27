@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Logo } from "@/components/Logo";
+import { NavLinks } from "@/components/NavLinks";
 import { SearchBox } from "@/components/SearchBox";
 import { SetupNotice } from "@/components/SetupNotice";
 import { UserMenu } from "@/components/UserMenu";
@@ -24,19 +24,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 bg-bg/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] max-w-6xl items-center gap-3 px-4 sm:gap-8 sm:px-6">
           <Logo />
-          <nav className="hidden items-center gap-7 text-body md:flex">
-            <Link href="/" className="font-medium hover:text-muted">
-              Discover
-            </Link>
-            {user.role === "admin" && (
-              <Link href="/admin" className="text-muted hover:text-text">
-                Users
-              </Link>
-            )}
-          </nav>
+          <NavLinks isAdmin={user.role === "admin"} />
           <div className="ml-auto w-full max-w-xs">
             <Suspense>
               <SearchBox />
@@ -46,7 +37,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
       <SetupNotice isAdmin={user.role === "admin"} />
-      <main id="main" className="mx-auto max-w-6xl px-4 pb-48 pt-6 sm:px-6">
+      {/* Room for the player bar, whose height <Player> publishes as --player-space. */}
+      <main id="main" className="mx-auto max-w-6xl px-4 pb-[calc(var(--player-space,0px)+3rem)] pt-6 sm:px-6">
         {children}
       </main>
       <Player userId={user.id} />
