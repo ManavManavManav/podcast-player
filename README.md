@@ -181,3 +181,7 @@ The end-to-end tests start the production build against `scripts/fake-providers.
 - **The first seconds after pressing play or seeking aren't covered** until that window comes back (a few seconds), so an ad right at that spot can start playing before it's skipped.
 - **Some hosts don't pin.** If a host serves a different stitched file on every request, even at the final URL, detected timings can drift. The player falls back gracefully, but skips may land a little off.
 - **No password reset by email.** The admin sets a new password from the Users page instead.
+
+## License
+
+[MIT](LICENSE).
