@@ -325,8 +325,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
    - *Decided:* Won't do (Q1: Vercel only; self-hosting is only for testing).
 43. [blocked] **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
    - *Blocked:* Q1. Also needs your Turso/Vercel accounts for per-environment databases. The backup and restore *procedure* is written up in the runbook (#45a).
-44. [blocked] **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
-   - *Blocked:* Q10 (production branch; commit AGENTS.md/CLAUDE.md; delete `.venv/` and the `TRANSCRIPTION`/`WASM` branches).
+44. [partly done] **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
+   - *Partly done:* Deleted remote branches `TRANSCRIPTION` (tip `9ea0a58b9dff807b58cc874ce93e43d49d38a76c`) and `WASM` (`5f2f24d8b21ea6f3ec4bd33ac11be21804437069`). Both were fully merged into `vercel-api` (0 unique commits); restore with `git push origin <sha>:refs/heads/<name>` if ever needed. Deleted the local `.venv/` (2.1 GB of old local-Whisper tooling, untracked) and its dead `.gitignore`/ESLint entries (plus `/.cache/`, which nothing writes). Committed `AGENTS.md`/`CLAUDE.md`, which `next dev` rewrites, so the tree stays clean. **Left for you:** `main` is also fully merged (it's the same commit as `vercel-api`'s base), but it's the repo's default branch and probably Vercel's production branch, so removing it means changing both settings (see the question at the end).
 
 ### Phase 8: Docs
 45a. [x] **Runbook, SECURITY.md, CONTRIBUTING.md, CHANGELOG (X-1; split from #45).** *Verify:* a dry run on a fresh clone, following only CONTRIBUTING.md, gets to green `npm run check` and E2E.

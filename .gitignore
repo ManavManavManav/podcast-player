@@ -41,13 +41,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local analysis cache
-/.cache/
 
 /.data/
 
-# Python virtualenv for Whisper
-.venv/
 
 # end-to-end test runs
 /.e2e-data/
