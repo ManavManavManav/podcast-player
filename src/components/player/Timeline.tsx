@@ -110,7 +110,7 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
           />
           {ads.map((ad) => (
             <div
-              key={ad.start}
+              key={`${ad.start}-${ad.end}`}
               className={`absolute inset-y-0 rounded-sm bg-ad ${ad.end <= shown ? "opacity-50" : ""}`}
               style={{ left: pct(ad.start), width: pct(ad.end - ad.start) }}
               title={`Ad · ${formatClock(ad.start)}–${formatClock(ad.end)}`}

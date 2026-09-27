@@ -14,6 +14,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
   const [error, setError] = useState<string | null>(null);
   const [passwordFor, setPasswordFor] = useState<string | null>(null);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const act = async (user: AdminUser, action: Action, extra: Record<string, string> = {}) => {
@@ -120,15 +121,23 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                   className="flex w-full flex-wrap items-center gap-2"
                 >
                   <input
-                    type="text"
+                    type={showPassword ? "text" : "password"}
                     required
                     minLength={10}
-                    autoComplete="off"
+                    autoComplete="new-password"
                     placeholder="New password (10+ characters)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="h-10 min-w-0 flex-1 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((shown) => !shown)}
+                    aria-pressed={showPassword}
+                    className="h-10 rounded-full border border-border px-4 text-xs font-medium hover:bg-surface-2"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
                   <button
                     type="submit"
                     disabled={busy !== null}

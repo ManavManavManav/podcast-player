@@ -4,6 +4,7 @@ import { LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { authClient } from "@/lib/authClient";
+import { safeNext } from "@/lib/redirect";
 
 type Mode = "login" | "signup";
 
@@ -13,24 +14,35 @@ export function AuthForm({
   mode,
   next,
   socialProviders,
+  setupCode: askForSetupCode = false,
 }: {
   mode: Mode;
   next: string;
   socialProviders: Array<keyof typeof PROVIDER_LABELS>;
+  /** The admin account doesn't exist yet: creating it takes the server's setup code. */
+  setupCode?: boolean;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const signup = mode === "signup";
+  // Checked again here, since this is where the browser is actually sent.
+  const destination = safeNext(next);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setPending(true);
     const { error } = signup
-      ? await authClient.signUp.email({ name: name.trim(), email: email.trim(), password })
+      ? await authClient.signUp.email({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          ...(askForSetupCode ? { fetchOptions: { headers: { "x-podblock-setup-code": setupCode.trim() } } } : {}),
+        })
       : await authClient.signIn.email({ email: email.trim(), password, rememberMe: true });
     if (error) {
       setError(friendlyError(error.code, error.message));
@@ -38,14 +50,18 @@ export function AuthForm({
       return;
     }
     // A full navigation, so every server component sees the new session.
-    window.location.assign(next);
+    window.location.assign(destination);
   };
 
   return (
     <div className="rounded-3xl bg-surface p-6 sm:p-8">
       <h1 className="font-serif text-3xl tracking-[-0.01em]">{signup ? "Create your account" : "Sign in"}</h1>
       <p className="mt-2 text-sm text-muted">
-        {signup ? "New accounts are approved by this server's owner before first use." : "Welcome back."}
+        {signup
+          ? askForSetupCode
+            ? "Create the admin account, with the email and setup code set on the server."
+            : "New accounts are approved by this server's owner before first use."
+          : "Welcome back."}
       </p>
 
       {socialProviders.length > 0 && (
@@ -56,7 +72,7 @@ export function AuthForm({
                 key={provider}
                 type="button"
                 disabled={pending}
-                onClick={() => authClient.signIn.social({ provider, callbackURL: next })}
+                onClick={() => authClient.signIn.social({ provider, callbackURL: destination })}
                 className="hover-breathe h-11 rounded-full border border-accent text-sm font-medium disabled:opacity-60 [--hover-scale:1.02]"
               >
                 Continue with {PROVIDER_LABELS[provider]}
@@ -98,6 +114,19 @@ export function AuthForm({
             className={inputClass}
           />
         </Field>
+
+        {signup && askForSetupCode && (
+          <Field label="Setup code" hint="PODBLOCK_SETUP_CODE on the server">
+            <input
+              required
+              aria-label="Setup code"
+              autoComplete="off"
+              value={setupCode}
+              onChange={(e) => setSetupCode(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+        )}
 
         {error && (
           <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">

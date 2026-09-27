@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "@/lib/server/errors";
 import { detectAds } from "@/lib/server/llm/detect";
 
 const window = [
@@ -63,5 +64,43 @@ describe("detectAds", () => {
 
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ choices: [{ message: { content: null }, finish_reason: "length" }] })));
     await expect(detectAds(window, [], {}, config)).rejects.toThrow(/ran out of tokens/);
+  });
+
+  it("marks its failures as detection errors", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-a" };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "down" }, { status: 503 })));
+    const apiError = await detectAds(window, [], {}, config).catch((e) => e);
+    expect(apiError).toBeInstanceOf(AppError);
+    expect(apiError.kind).toBe("detection");
+
+    vi.stubGlobal("fetch", vi.fn(async () => answer("no json here")));
+    const parseError = await detectAds(window, [], {}, config).catch((e) => e);
+    expect(parseError).toBeInstanceOf(AppError);
+    expect(parseError.kind).toBe("detection");
+  });
+
+  it("doesn't give up on the extras for errors that aren't about them (E-3)", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-context" };
+    const tooLong = () => Response.json({ error: { message: "This model's maximum context length is 8192 tokens" } }, { status: 400 });
+    vi.stubGlobal("fetch", vi.fn(async () => tooLong()));
+    await expect(detectAds(window, [], {}, config)).rejects.toThrow(/context length/);
+
+    const fetchMock = vi.fn(async () => answer('{"ads":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    await detectAds(window, [], {}, config);
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).thinking).toEqual({ type: "disabled" });
+  });
+
+  it("retries once when the provider is rate-limiting or briefly down", async () => {
+    const config = { baseUrl: "https://llm.example/v1", apiKey: "sk", model: "model-retry" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503, headers: { "retry-after": "0" } }))
+      .mockImplementation(async () => answer('{"ads":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await detectAds(window, [], {}, config)).ads).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Still asked with the extras: a 503 says nothing about them.
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1].body)).thinking).toEqual({ type: "disabled" });
   });
 });

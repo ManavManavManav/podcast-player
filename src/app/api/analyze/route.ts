@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { WINDOW_SECONDS, whisperLanguage } from "@/lib/analysis";
 import { analyzeWindow, cachedAnalysis } from "@/lib/server/analyzer";
+import { AppError, publicError } from "@/lib/server/errors";
+import { log, withRequestContext } from "@/lib/server/log";
 import { isHttpUrl } from "@/lib/server/audio";
 import { isPublicUrl, rejectCrossSite } from "@/lib/server/guard";
 import { requireUser } from "@/lib/server/session";
@@ -8,6 +10,17 @@ import type { EpisodeContext } from "@/lib/types";
 
 /** Fetching, transcribing and classifying a window takes seconds; allow for slow hosts. */
 export const maxDuration = 120;
+/** Give up with time to answer before the platform stops the function mid-write. */
+const DEADLINE_MS = (maxDuration - 10) * 1000;
+/** Transcripts are saved as soon as they're done, so a retry picks up where this left off. */
+const RETRY_AFTER_SECONDS = 10;
+
+/** A signal that aborts after `ms`, with a timer that can be cleared. */
+function deadline(ms: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException("Analysis deadline passed", "TimeoutError")), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
 
 /** 12 hours: longer than any real episode, short enough to reject junk. */
 const MAX_START = 12 * 3600;
@@ -37,7 +50,11 @@ export async function GET(req: NextRequest) {
 }
 
 /** Analyzes one window of an episode (or returns it from the cache). */
-export async function POST(req: NextRequest) {
+export function POST(req: NextRequest) {
+  return withRequestContext(req, () => analyze(req));
+}
+
+async function analyze(req: NextRequest) {
   const refused = rejectCrossSite(req);
   if (refused) return refused;
   const user = await requireUser();
@@ -70,6 +87,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Audio must be on a public host" }, { status: 400 });
   }
 
+  const limit = deadline(DEADLINE_MS);
   try {
     const result = await analyzeWindow(
       url,
@@ -77,16 +95,26 @@ export async function POST(req: NextRequest) {
       whisperLanguage(typeof language === "string" ? language : undefined),
       episodeContext(body.episode && typeof body.episode === "object" ? (body.episode as Record<string, unknown>) : {}),
       user.id,
-      req.signal,
+      AbortSignal.any([req.signal, limit.signal]),
     );
     return NextResponse.json(result);
   } catch (err) {
     const error = err as Error;
-    if (error.name === "AbortError") {
+    if (req.signal.aborted) {
       // The player moved on; nobody is listening for this response.
       return new NextResponse(null, { status: 499 });
     }
-    console.error("[podblock] analysis failed:", error.message);
-    return NextResponse.json({ error: error.message }, { status: 502 });
+    if (error.name === "AbortError" || error.name === "TimeoutError") {
+      // Out of time, or shared work was cancelled under us: worth retrying.
+      const { status, body } = publicError(new AppError("timeout", `Analysis stopped: ${error.message}`));
+      log.warn("analysis.stopped", { window, userId: user.id, reason: limit.signal.aborted ? "deadline" : error.message });
+      return NextResponse.json(body, { status, headers: { "Retry-After": String(RETRY_AFTER_SECONDS) } });
+    }
+    // Full details for the log; the listener gets a message meant for them.
+    const { status, body } = publicError(err);
+    log.error("analysis.failed", { window, userId: user.id, code: body.code, err: error });
+    return NextResponse.json(body, { status });
+  } finally {
+    limit.clear();
   }
 }
