@@ -73,6 +73,7 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-newsreader), Georgia, ui-serif, serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-grotesk: var(--font-space-grotesk), "Helvetica Neue", Arial, sans-serif;
 
   /* Type scale beyond Tailwind's defaults (text-micro, text-meta…). Line height is inherited. */
   --text-micro: 11px;
@@ -174,6 +175,22 @@ body {
   animation: toast-in 180ms ease-out;
 }
 
+/* The Stage opening: the ground comes up from the bar. */
+@keyframes stage-in {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+.animate-stage-in {
+  animation: stage-in 420ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
 /* The player bar appearing where the play burst's sticks land (PlayBurst.tsx, BAR_REVEAL_MS). */
 @keyframes bar-materialize {
   from {
@@ -191,6 +208,55 @@ body {
 .animate-bar-materialize {
   /* Delay and duration are set inline from PlayBurst's timing. */
   animation: bar-materialize 350ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+/* ---------------------------------------------------------------------------
+   Block wipe: a solid block sweeps across and leaves the text behind it.
+   The text appears at the midpoint, while the block covers it. Used on the
+   Stage for the title and each transcript line as it arrives. The block is
+   the text's own colour unless --wipe says otherwise.
+   ------------------------------------------------------------------------- */
+
+@keyframes wipe-block {
+  0% {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  45% {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+  55% {
+    transform: scaleX(1);
+    transform-origin: right;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: right;
+  }
+}
+
+@keyframes wipe-text {
+  0% {
+    -webkit-text-fill-color: transparent;
+  }
+  50%,
+  100% {
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+.wipe {
+  position: relative;
+  animation: wipe-text var(--wipe-ms, 900ms) steps(1, end) both;
+}
+.wipe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--wipe, currentColor);
+  pointer-events: none;
+  animation: wipe-block var(--wipe-ms, 900ms) cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 
 /* ---------------------------------------------------------------------------

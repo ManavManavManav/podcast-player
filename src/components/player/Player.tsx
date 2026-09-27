@@ -2,6 +2,7 @@
 
 import {
   LoaderCircle,
+  Maximize2,
   Moon,
   Pause,
   Play,
@@ -15,7 +16,6 @@ import {
   VolumeX,
   X,
 } from "lucide-react";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Artwork } from "@/components/Artwork";
 import { MenuItem, Popover } from "@/components/player/Popover";
@@ -23,6 +23,7 @@ import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { BAR_FADE_MS, BAR_REVEAL_MS, barShouldMaterialize } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Timeline } from "@/components/player/Timeline";
+import { Stage } from "@/components/stage/Stage";
 import { IconButton } from "@/components/ui/IconButton";
 import { useAdScanner } from "@/hooks/useAdScanner";
 import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
@@ -58,6 +59,7 @@ export function Player({ userId }: { userId: string }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const episode = usePlayer((s) => s.episode);
   const panelOpen = usePlayer((s) => s.panelOpen);
+  const stageOpen = usePlayer((s) => s.stageOpen);
   const [notice, setNotice] = useState<SkipNotice | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
@@ -297,7 +299,7 @@ export function Player({ userId }: { userId: string }) {
 
   useMediaSession();
   useKeyboardShortcuts();
-  const dock = usePlayerSpace(Boolean(episode));
+  const dock = usePlayerSpace(Boolean(episode) && !stageOpen);
 
   return (
     <>
@@ -371,7 +373,8 @@ export function Player({ userId }: { userId: string }) {
           });
         }}
       />
-      {episode && (
+      {episode && stageOpen && <Stage notice={notice} holding={holding} onUndo={undoSkip} onDismiss={dismissNotice} />}
+      {episode && !stageOpen && (
         <div
           ref={dock}
           className="pointer-events-none fixed inset-x-0 bottom-0 z-50 px-[max(0.5rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
@@ -401,7 +404,7 @@ function playUpNext() {
 function PlayerBar() {
   const episode = usePlayer((s) => s.episode)!;
   const { playing, buffering, holding, currentTime, duration } = usePlayback();
-  const { toggle, skipBy, seek, stop } = usePlayer();
+  const { toggle, skipBy, seek, stop, setStageOpen } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
   const segments = useAnalysis((s) => s.segments);
@@ -417,11 +420,13 @@ function PlayerBar() {
       }`}
     >
       <div className="flex items-center gap-3">
-        <Link href={`/podcast/${episode.podcastId}`} className="shrink-0" aria-label={`Go to ${episode.podcastTitle}`}>
-          <Artwork src={episode.image} alt="" priority className="size-12 rounded-xl" />
-        </Link>
+        <button onClick={() => setStageOpen(true)} className="group shrink-0" aria-label="Open Now Playing">
+          <Artwork src={episode.image} alt="" priority className="size-12 rounded-xl transition-transform group-hover:scale-105" />
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-serif text-lg leading-tight">{episode.title}</p>
+          <button onClick={() => setStageOpen(true)} className="block max-w-full truncate text-left font-serif text-lg leading-tight hover:underline" title="Open Now Playing (F)">
+            {episode.title}
+          </button>
           <StatusLine podcastTitle={episode.podcastTitle} />
         </div>
 
@@ -453,6 +458,9 @@ function PlayerBar() {
         <div className="hidden flex-1 items-center justify-end gap-1 md:flex">
           <SecondaryControls />
         </div>
+        <IconButton label="Open Now Playing (F)" onClick={() => setStageOpen(true)} className="max-md:hidden">
+          <Maximize2 className="size-4" />
+        </IconButton>
         <IconButton label="Close player" onClick={stop}>
           <X className="size-4" />
         </IconButton>
@@ -759,7 +767,7 @@ function useMediaSession() {
   }, [playing]);
 }
 
-/** Space/K play-pause, J/← back, L/→ forward, M mute, T transcript, S ad skipping, V background. */
+/** Space/K play-pause, J/← back, L/→ forward, M mute, T transcript, S ad skipping, F Now Playing, V background. */
 function useKeyboardShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -793,6 +801,9 @@ function useKeyboardShortcuts() {
           break;
         case "s":
           player.setAutoSkip(!player.autoSkip);
+          break;
+        case "f":
+          player.setStageOpen(!player.stageOpen);
           break;
         case "v":
           player.setField(resolveFieldMode(player.field) === "off" ? "auto" : "off");

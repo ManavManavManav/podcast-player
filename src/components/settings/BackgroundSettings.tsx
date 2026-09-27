@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { resolveFieldMode, usePlayer, type FieldMode } from "@/store/player";
 
 const MODES: Array<{ mode: Exclude<FieldMode, "auto">; label: string; hint: string }> = [
@@ -14,7 +15,13 @@ export function BackgroundSettings() {
   const intensity = usePlayer((s) => s.fieldIntensity);
   const setField = usePlayer((s) => s.setField);
   const setIntensity = usePlayer((s) => s.setFieldIntensity);
-  const current = resolveFieldMode(field);
+  // "auto" depends on the device, which the server can't know: resolve it after mounting.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const current = mounted ? resolveFieldMode(field) : null;
 
   return (
     <section className="rounded-3xl bg-surface p-6 sm:p-8">

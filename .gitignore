@@ -53,3 +53,4 @@ next-env.d.ts
 # UI screenshots (scripts/ux-shots.mjs)
 /.ux-shots/
 /.ux-shots-data/
+/.ux-shots-app/

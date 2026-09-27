@@ -2,8 +2,9 @@
 // providers and a dev server on a throwaway database, with the same settings
 // as the end-to-end tests, so a developer's .env.local never leaks in.
 
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
 
 const APP_PORT = 3996;
 const FAKE_PORT = 4012;
@@ -12,6 +13,7 @@ const FAKE = `http://127.0.0.1:${FAKE_PORT}`;
 
 const appEnv = {
   ...process.env,
+  // Relative to the copy of the app (.ux-shots-app).
   PODBLOCK_DATA_DIR: ".ux-shots-data",
   DATABASE_URL: "",
   DATABASE_AUTH_TOKEN: "",
@@ -39,8 +41,8 @@ const appEnv = {
 };
 
 const children = [];
-function start(command, commandArgs, env) {
-  const child = spawn(command, commandArgs, { env, stdio: ["ignore", "ignore", "inherit"] });
+function start(command, commandArgs, env, cwd) {
+  const child = spawn(command, commandArgs, { env, cwd, stdio: ["ignore", "ignore", "inherit"] });
   children.push(child);
   return child;
 }
@@ -61,11 +63,31 @@ async function waitFor(url, timeoutMs = 120_000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+/**
+ * A copy of the app to run, in .ux-shots-app: Next.js allows one dev server
+ * per folder, and a developer's own may already be running here. Source files
+ * are copied (tracked and new ones, not ignored ones like .env.local);
+ * node_modules is hard-linked, which is instant and takes no space.
+ */
+function copyApp() {
+  const dir = path.resolve(".ux-shots-app");
+  fs.rmSync(dir, { recursive: true, force: true });
+  const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { encoding: "utf8" })
+    .split("\0")
+    .filter((f) => f && fs.existsSync(f));
+  for (const file of files) {
+    fs.mkdirSync(path.join(dir, path.dirname(file)), { recursive: true });
+    fs.copyFileSync(file, path.join(dir, file));
+  }
+  execFileSync("cp", ["-al", "node_modules", path.join(dir, "node_modules")]);
+  return dir;
+}
+
 /** Starts both servers on a fresh database and waits until they answer. */
 export async function startApp() {
-  fs.rmSync(".ux-shots-data", { recursive: true, force: true });
+  const dir = copyApp();
   start(process.execPath, ["scripts/fake-providers.mjs", "--port", String(FAKE_PORT)], process.env);
-  start(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-H", "127.0.0.1", "-p", String(APP_PORT)], appEnv);
+  start(process.execPath, ["node_modules/next/dist/bin/next", "dev", "-H", "127.0.0.1", "-p", String(APP_PORT)], appEnv, dir);
   await waitFor(`${FAKE}/podcastindex/podcasts/trending`);
   await waitFor(`${APP}/login`);
 }

@@ -93,6 +93,10 @@ interface PlayerState {
   field: FieldMode;
   /** How strongly it draws, 0–1. */
   fieldIntensity: number;
+  /** A drawing chosen on the Stage for this visit, instead of the show's own (index into PRINCIPLES). Not saved. */
+  fieldStyle: number | null;
+  /** The full-window Now Playing view. Not saved: a reload starts on the page. */
+  stageOpen: boolean;
 
   /** Plays `episode`; `list` is the show's episode list it was chosen from, if any. */
   play: (episode: Episode, list?: Episode[]) => void;
@@ -113,6 +117,8 @@ interface PlayerState {
   setAutoNext: (on: boolean) => void;
   setField: (mode: FieldMode) => void;
   setFieldIntensity: (intensity: number) => void;
+  setFieldStyle: (style: number | null) => void;
+  setStageOpen: (open: boolean) => void;
   /** The episode to play after `episode` ends, or null. */
   nextAfter: (episode: Episode) => Episode | null;
 }
@@ -166,6 +172,8 @@ export const usePlayer = create<PlayerState>()(
       following: {},
       field: "auto",
       fieldIntensity: 0.6,
+      fieldStyle: null,
+      stageOpen: false,
 
       play: (episode, list) => {
         const { audio } = usePlayback.getState();
@@ -206,7 +214,7 @@ export const usePlayer = create<PlayerState>()(
         get().savePosition();
         usePlayback.getState().audio?.pause();
         usePlayback.setState({ source: null, playing: false, currentTime: 0, duration: 0, error: null });
-        set({ episode: null, panelOpen: false, sleepAt: null });
+        set({ episode: null, panelOpen: false, sleepAt: null, stageOpen: false });
       },
 
       setVolume: (volume) => set({ volume, muted: volume === 0 }),
@@ -240,6 +248,8 @@ export const usePlayer = create<PlayerState>()(
       setAutoNext: (autoNext) => set({ autoNext }),
       setField: (field) => set({ field }),
       setFieldIntensity: (fieldIntensity) => set({ fieldIntensity: Math.min(1, Math.max(0, fieldIntensity)) }),
+      setFieldStyle: (fieldStyle) => set({ fieldStyle }),
+      setStageOpen: (stageOpen) => set({ stageOpen }),
 
       nextAfter: (episode) => {
         const { following, recent, positions } = get();
