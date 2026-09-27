@@ -3,7 +3,7 @@
 import { Check, CircleAlert } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { authClient } from "@/lib/authClient";
 
 export function AccountSettings({ name, email }: { name: string; email: string }) {
@@ -46,8 +46,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
 
       <form onSubmit={changePassword} className="mt-6 grid max-w-sm gap-3">
         <h3 className="font-serif text-xl">Change password</h3>
-        <Input
-          type="password"
+        <PasswordInput
           required
           autoComplete="current-password"
           placeholder="Current password"
@@ -55,8 +54,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
         />
-        <Input
-          type="password"
+        <PasswordInput
           required
           minLength={10}
           autoComplete="new-password"

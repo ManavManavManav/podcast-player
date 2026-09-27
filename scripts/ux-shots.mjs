@@ -101,12 +101,12 @@ async function walk(name, contextOptions, signUp) {
     await shot("signup");
     await page.getByLabel("Name").fill(OWNER.name);
     await page.getByLabel("Email").fill(OWNER.email);
-    await page.getByLabel("Password").fill(OWNER.password);
+    await page.getByLabel("Password", { exact: true }).fill(OWNER.password);
     await page.getByLabel("Setup code").fill("ux-shots-code");
     await page.getByRole("button", { name: "Create account" }).click();
   } else {
     await page.getByLabel("Email").fill(OWNER.email);
-    await page.getByLabel("Password").fill(OWNER.password);
+    await page.getByLabel("Password", { exact: true }).fill(OWNER.password);
     await page.getByRole("button", { name: "Sign in" }).click();
   }
   await page.waitForURL(`${APP}/`);

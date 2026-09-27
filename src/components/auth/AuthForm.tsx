@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { authClient } from "@/lib/authClient";
 import { safeNext } from "@/lib/redirect";
 
@@ -104,10 +105,9 @@ export function AuthForm({
           />
         </Field>
         <Field label="Password" hint={signup ? "At least 10 characters" : undefined}>
-          <Input
+          <PasswordInput
             required
             aria-label="Password"
-            type="password"
             minLength={signup ? 10 : undefined}
             autoComplete={signup ? "new-password" : "current-password"}
             value={password}
@@ -157,6 +157,12 @@ export function AuthForm({
           </>
         )}
       </p>
+      {!signup && (
+        // There's no email reset: the server's owner sets a new password from the Users page.
+        <p className="mt-2 text-center text-xs text-faint">
+          Forgot your password? Ask the person who runs this server to set a new one.
+        </p>
+      )}
     </div>
   );
 }

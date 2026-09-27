@@ -3,7 +3,7 @@
 import { CircleAlert } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Field";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import type { AdminUser } from "@/lib/types";
 
 type Action = "approve" | "disable" | "enable" | "delete" | "set-password";
@@ -16,7 +16,6 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
   const [error, setError] = useState<string | null>(null);
   const [passwordFor, setPasswordFor] = useState<string | null>(null);
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   const act = async (user: AdminUser, action: Action, extra: Record<string, string> = {}) => {
@@ -122,8 +121,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                   }}
                   className="flex w-full flex-wrap items-center gap-2"
                 >
-                  <Input
-                    type={showPassword ? "text" : "password"}
+                  <PasswordInput
                     required
                     minLength={10}
                     autoComplete="new-password"
@@ -131,17 +129,9 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                     aria-label={`New password for ${user.email}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-10 w-auto min-w-0 flex-1"
+                    className="h-10"
+                    containerClassName="min-w-0 flex-1 basis-56"
                   />
-                  <Button
-                    size="sm"
-                    variant="subtle"
-                    onClick={() => setShowPassword((shown) => !shown)}
-                    aria-pressed={showPassword}
-                    className="h-10 px-4"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </Button>
                   <Button type="submit" size="sm" disabled={busy !== null} className="h-10 px-5">
                     Save
                   </Button>

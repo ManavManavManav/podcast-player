@@ -15,7 +15,7 @@ async function signUp(browser: Browser, who: typeof OWNER, setupCode?: string): 
   await page.goto("/signup");
   await page.getByLabel("Name").fill(who.name);
   await page.getByLabel("Email").fill(who.email);
-  await page.getByLabel("Password").fill(who.password);
+  await page.getByLabel("Password", { exact: true }).fill(who.password);
   if (setupCode) await page.getByLabel("Setup code").fill(setupCode);
   await page.getByRole("button", { name: "Create account" }).click();
   return page;
@@ -24,7 +24,7 @@ async function signUp(browser: Browser, who: typeof OWNER, setupCode?: string): 
 async function signIn(page: Page, who: typeof OWNER) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(who.email);
-  await page.getByLabel("Password").fill(who.password);
+  await page.getByLabel("Password", { exact: true }).fill(who.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: /Podcasts,\s*minus the ads/ })).toBeVisible();
 }
@@ -79,7 +79,7 @@ test("a signed-out visitor is sent to sign in, and back afterwards", async ({ pa
   await page.goto("/podcast/1001");
   await expect(page).toHaveURL(/\/login\?next=%2Fpodcast%2F1001/);
   await page.getByLabel("Email").fill(OWNER.email);
-  await page.getByLabel("Password").fill(OWNER.password);
+  await page.getByLabel("Password", { exact: true }).fill(OWNER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "The Fixture Show" })).toBeVisible();
 });

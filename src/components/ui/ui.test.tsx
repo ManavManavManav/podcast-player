@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { IconButton } from "@/components/ui/IconButton";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 
 afterEach(cleanup);
 
@@ -45,5 +46,32 @@ describe("Field", () => {
     );
     expect(screen.getByLabelText(/Email/)).toBeTruthy();
     expect(screen.getByText("We never share it")).toBeTruthy();
+  });
+});
+
+describe("PasswordInput", () => {
+  it("shows and hides the password", () => {
+    render(<PasswordInput aria-label="Password" defaultValue="hunter22" />);
+    const input = screen.getByLabelText("Password", { exact: true });
+    expect(input.getAttribute("type")).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(input.getAttribute("type")).toBe("text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide password" }));
+    expect(input.getAttribute("type")).toBe("password");
+  });
+
+  it("warns while Caps Lock is on", () => {
+    render(<PasswordInput aria-label="Password" />);
+    const input = screen.getByLabelText("Password", { exact: true });
+    // happy-dom doesn't track modifier state, so the event reports it itself.
+    const key = (type: string, capsLock: boolean) => {
+      const event = new KeyboardEvent(type, { key: "a", bubbles: true });
+      Object.defineProperty(event, "getModifierState", { value: (k: string) => capsLock && k === "CapsLock" });
+      return event;
+    };
+    fireEvent(input, key("keydown", true));
+    expect(screen.getByText("Caps Lock is on")).toBeTruthy();
+    fireEvent(input, key("keyup", false));
+    expect(screen.queryByText("Caps Lock is on")).toBeNull();
   });
 });
