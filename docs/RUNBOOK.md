@@ -37,6 +37,10 @@ The server writes one JSON object per line to stdout/stderr (Vercel's log viewer
 2. **Migrate first** when the schema changed: `DATABASE_URL=... DATABASE_AUTH_TOKEN=... npm run migrate`. It's safe to run repeatedly and prints `Migrated (...)` or `Already up to date (...)`. The server would also migrate on its own on first use, but doing it before the deploy keeps that off the first listener's request.
 3. Deploy, then check `/api/readyz`.
 
+## Preview deployments
+
+Vercel builds every pushed branch as a preview. Give previews their **own database**: in the project's Environment Variables, set `DATABASE_URL` and `DATABASE_AUTH_TOKEN` separately for **Production** and for **Preview** (a second Turso database, or a Turso branch of production). Otherwise previews read and write real accounts and transcripts, and run migrations against production. Previews can share the provider keys; each preview needs its own admin sign-up (with `PODBLOCK_SETUP_CODE`) on its empty database. Cron jobs run only on production.
+
 ## Accounts
 
 - **Creating the admin account:** set `PODBLOCK_ADMIN_EMAIL` and `PODBLOCK_SETUP_CODE` (`openssl rand -hex 12`), open `/signup`, and enter the code; the form asks for it until the admin exists. A refused attempt is logged as `auth.owner_signup_refused`. Signing in with GitHub or Google (verified email) works without the code.

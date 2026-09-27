@@ -6,11 +6,11 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 
 ## Status (2026-09-26, branch `production-hardening`)
 
-- **Done: 38 work items**, each its own commit with tests written first (characterization tests before changing uncovered code). The unit/integration suite went from 30 tests (8.8% line coverage) to 317 passing tests, plus 3 Playwright end-to-end journeys. See the notes under each item in §3.
-- **Blocked on your decisions: 10 items**. 7 (Q3), 11 (Q8), 12 (Q9), 13 (Q4), 33 (Q6), 40 (Q5), 42–43 (Q1), 44 (Q10), 45b (Q11). New **Q14** came from the seek measurements (#21).
-- **Not yet verified on GitHub:** nothing has been pushed, so the CI workflow, Dependabot config and the Node 22/24 matrix have only been checked locally (same commands, and a fresh clone).
-- **Your running `next dev` (:3001)** picks up these changes as files change. On its next restart it will: send the new security headers; run the schema migration (verified on a copy of your database: all data kept, the empty `user_settings` table dropped, `rateLimit` added); and log JSON lines.
-- **GitHub private vulnerability reporting is off** for the repo; `SECURITY.md` works either way.
+- **Done: 43 work items** (including #7, #40, #45b and the new #46 after your answers), each its own commit with tests written first. The suite went from 30 tests (8.8% of lines covered) to **345 passing** unit/integration tests plus 3 Playwright end-to-end journeys.
+- **Won't do (your decisions):** #13 quotas, #33 error tracking, #42 self-host packaging.
+- **Still open:** #11 ffmpeg build (Q8) and #12 episode context (Q9), asked again in plainer terms; #43 is settings in your Vercel/Turso accounts (documented); #44 is done except deleting `main` (needs the default-branch and Vercel production-branch settings changed).
+- **Not pushed yet**, so CI, Dependabot and the Node 22/24 matrix have only been checked locally (same commands, plus a fresh clone).
+- **Before deploying:** add `PODBLOCK_SETUP_CODE` (only needed for a fresh database) and `CRON_SECRET` in Vercel, and give Preview its own `DATABASE_URL` (RUNBOOK).
 
 ## Decisions (answered 2026-09-26)
 
@@ -323,8 +323,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
    - *Done:* Added `.github/dependabot.yml`: weekly npm updates with minor and patch grouped into one PR, weekly GitHub Actions updates, and `@playwright/test` minor/major bumps excluded because its version must match the browser CI installs. `engines.node` goes `>=20.9` → **`>=22`** (Node 20 reached end-of-life in April 2026). The doctor and README match. I deliberately didn't use an exact `24.x` pin, because Vercel chooses its Node major from `engines` and `>=22` resolves to 24 as today. **Verified the floor rather than assuming it:** the full unit suite passes on Node 22.23.3 (317 passed), and CI's check job now runs a matrix of 22 and 24 (coverage uploaded from 24). The Dependabot config was only YAML-validated locally; GitHub validates it on push. No `packageManager` field: it would force corepack behaviour on contributors for no gain.
 42. [won't do] **Self-host packaging (D-1) (Q1).** `output: "standalone"`, a Dockerfile and a compose example. *Verify:* `docker build` and `docker run`, then the E2E suite passes against the container.
    - *Decided:* Won't do (Q1: Vercel only; self-hosting is only for testing).
-43. [blocked] **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
-   - *Blocked:* Q1. Also needs your Turso/Vercel accounts for per-environment databases. The backup and restore *procedure* is written up in the runbook (#45a).
+43. [your action] **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
+   - *Documented (Q1: Vercel only):* the RUNBOOK's new "Preview deployments" section says to set `DATABASE_URL`/`DATABASE_AUTH_TOKEN` separately for Preview (a second Turso DB or a Turso branch), and the backup procedure is in the RUNBOOK. The rest is settings in your Vercel/Turso accounts, which I can't reach. Region pinning (D-3) waits until you know your Turso region.
 44. [partly done] **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
    - *Partly done:* Deleted remote branches `TRANSCRIPTION` (tip `9ea0a58b9dff807b58cc874ce93e43d49d38a76c`) and `WASM` (`5f2f24d8b21ea6f3ec4bd33ac11be21804437069`). Both were fully merged into `vercel-api` (0 unique commits); restore with `git push origin <sha>:refs/heads/<name>` if ever needed. Deleted the local `.venv/` (2.1 GB of old local-Whisper tooling, untracked) and its dead `.gitignore`/ESLint entries (plus `/.cache/`, which nothing writes). Committed `AGENTS.md`/`CLAUDE.md`, which `next dev` rewrites, so the tree stays clean. **Left for you:** `main` is also fully merged (it's the same commit as `vercel-api`'s base), but it's the repo's default branch and probably Vercel's production branch, so removing it means changing both settings (see the question at the end).
 
