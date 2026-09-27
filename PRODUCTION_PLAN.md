@@ -8,8 +8,10 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 
 - **Done: 44 work items** (including #7, #11, #40, #45b and the new #46 after your answers), each its own commit with tests written first. The suite went from 30 tests (8.8% of lines covered) to **346 passing** unit/integration tests plus 3 Playwright end-to-end journeys.
 - **Won't do (your decisions):** #12 episode-context hardening, #13 quotas, #33 error tracking, #42 self-host packaging.
-- **Left:** #43 is settings in your Vercel/Turso accounts (documented in the RUNBOOK); #44 is done except deleting `main`, which waits until you've pointed Vercel's production branch at `vercel-api`.
-- **Before deploying:** add `PODBLOCK_SETUP_CODE` (only needed for a fresh database) and `CRON_SECRET` in Vercel, and give Preview its own `DATABASE_URL` (RUNBOOK).
+- **Left:** #43 is settings in your Vercel/Turso accounts (documented in the RUNBOOK); #44 is done except `main`: once you've pointed Vercel's production branch at `vercel-api`, I make `vercel-api` the GitHub default and delete `main`.
+- **Pushed** as `production-hardening`. **CI is green on GitHub** (Node 22 and 24 checks, and E2E). Its first run caught a flaky assertion of mine: ffmpeg's reconnect-and-resume made an offset request during an exact read, about 1 run in 8. Fixed and re-run 25 times locally. The actions were also moved to v7 (Node 24 runtime). **Vercel built previews of the branch successfully** (so the `ffmpeg-static` download and file tracing work on Vercel). They're behind Vercel's deployment protection, so I only confirmed the builds.
+- **Three Vercel projects** deploy from this repo (`podcast-player`, `podcast-player-pn69`, `podcast-player-xoj3`); probably two are leftovers worth deleting.
+- **Before merging to `vercel-api`:** add `CRON_SECRET` in Vercel and give Preview its own `DATABASE_URL` (RUNBOOK → Preview deployments). `PODBLOCK_SETUP_CODE` is only needed for a fresh database. The first production request after the deploy migrates the schema (tested on a copy of your data).
 
 ## Decisions (answered 2026-09-26)
 
