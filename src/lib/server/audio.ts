@@ -4,6 +4,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { Readable } from "node:stream";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import { canFastSeek, headBytesNeeded } from "@/lib/server/audioFormat";
 import { AppError } from "@/lib/server/errors";
 import { fetchPublic } from "@/lib/server/safeFetch";
 
@@ -73,13 +74,60 @@ async function withLoopbackProxy<T>(url: string, signal: AbortSignal, work: (loc
   }
 }
 
+// --- Choosing how to seek ------------------------------------------------------------
+
+const seekModes = (globalThis as unknown as { __podblockSeek?: Map<string, boolean> }).__podblockSeek ??= new Map();
+
+/** Reads at most `limit` bytes of a response body, then stops the download. */
+async function readUpTo(response: Response, limit: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const reader = response.body?.getReader();
+  if (!reader) return Buffer.alloc(0);
+  while (size < limit) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(Buffer.from(value));
+    size += value.length;
+  }
+  await reader.cancel().catch(() => {});
+  return Buffer.concat(chunks).subarray(0, limit);
+}
+
+/**
+ * Whether ffmpeg may jump straight to a window in this file (see
+ * audioFormat.ts), from its first bytes. Remembered per URL; any doubt
+ * means the exact read.
+ */
+async function fastSeekable(url: string, signal: AbortSignal): Promise<boolean> {
+  const known = seekModes.get(url);
+  if (known !== undefined) return known;
+  const read = async (bytes: number) => {
+    const { response } = await fetchPublic(url, {
+      headers: { Range: `bytes=0-${bytes - 1}`, "User-Agent": "Podblock/1.0" },
+      signal,
+    });
+    if (!response.ok) throw new Error(`Probe failed (${response.status})`);
+    return readUpTo(response, bytes);
+  };
+  let head = await read(64 * 1024);
+  const needed = headBytesNeeded(head.subarray(0, 16));
+  if (needed > head.length && head.length === 64 * 1024) head = await read(needed);
+  const fast = canFastSeek(head);
+  seekModes.set(url, fast);
+  if (seekModes.size > 500) seekModes.delete(seekModes.keys().next().value!);
+  return fast;
+}
+
 /**
  * Pulls `duration` seconds of audio starting at `start` straight from a
  * remote file, as 16 kHz mono FLAC: lossless for speech recognition, and
  * about half the size of WAV to upload.
  *
- * ffmpeg seeks with HTTP range requests, so only the bytes around the window
- * are downloaded, not the whole episode.
+ * ffmpeg reads the file with HTTP range requests. For files it can seek
+ * exactly by byte offset (constant-bitrate MP3, M4A) it jumps to the
+ * window; otherwise it reads from the start, which keeps timestamps exact
+ * (docs/seek-accuracy.md).
  */
 export async function extractWindow(
   url: string,
@@ -94,8 +142,10 @@ export async function extractWindow(
   const stop = () => controller.abort();
   signal?.addEventListener("abort", stop, { once: true });
   try {
+    // The first window needs no seeking; after that, probing once per file is cheap.
+    const fast = start > 0 && (await fastSeekable(url, controller.signal).catch(() => false));
     return await withLoopbackProxy(url, controller.signal, (localUrl) =>
-      runFfmpeg(localUrl, start, duration, controller.signal),
+      runFfmpeg(localUrl, start, duration, controller.signal, fast),
     );
   } catch (err) {
     if ((err as Error).name === "AbortError" || err instanceof AppError) throw err;
@@ -121,7 +171,7 @@ export function hasAudioFrames(flac: Buffer): boolean {
   }
 }
 
-function runFfmpeg(input: string, start: number, duration: number, signal: AbortSignal): Promise<Buffer> {
+function runFfmpeg(input: string, start: number, duration: number, signal: AbortSignal, fastSeek = false): Promise<Buffer> {
   const args = [
     "-nostdin",
     "-hide_banner",
@@ -131,6 +181,8 @@ function runFfmpeg(input: string, start: number, duration: number, signal: Abort
     "-reconnect", "1",
     "-reconnect_delay_max", "4",
     "-rw_timeout", "20000000",
+    // Jump by byte offset, only where that's exact (see fastSeekable).
+    ...(fastSeek ? ["-fflags", "+fastseek"] : []),
     "-ss", String(start),
     "-t", String(duration),
     "-i", input,

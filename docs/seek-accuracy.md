@@ -47,7 +47,11 @@ How precisely, and how cheaply, the analyzer's ffmpeg call (`src/lib/server/audi
 
 Not measured: whether the browser's own seeking in VBR MP3 (when a listener jumps) lands where ffmpeg's accurate decode says. Normal playback from the start decodes sequentially, which is the reference used here.
 
-## Options (open question Q14 in PRODUCTION_PLAN.md)
+## Decision
+
+**C, the hybrid**, is implemented (`src/lib/server/audioFormat.ts`, used by `extractWindow`). Every window after the first reads the file's first bytes once per URL: 64 KB, more if a large ID3 tag comes first. Constant-bitrate MP3 (a LAME `Info` tag, or no Xing/VBRI tag and at least 10 frames with one bitrate) and MP4/M4A get `-fflags +fastseek`; everything else, and any failed probe, keeps the exact read. `src/lib/server/audio.test.ts` checks, through the real pipeline, that a CBR file is range-seeked and a VBR one isn't, and that a beep lands within 0.1 s in both.
+
+## Options considered (Q14 in PRODUCTION_PLAN.md)
 
 - **A. Keep as is.** Exact, but MP3 bandwidth and latency grow with the playhead.
 - **B. Always fast-seek.** Cheap, but VBR MP3 ads are 2–5 s off.

@@ -24,9 +24,10 @@ let fixture: Buffer;
 let server: http.Server;
 let base: string;
 let requests: Array<{ url: string; range?: string }> = [];
-let bytesServed = 0;
 /** A longer episode, to show seeking doesn't download everything before the window. */
 let longFixture: Buffer;
+/** Two minutes with a 3 kHz beep at 100 s, constant and variable bitrate. */
+const beepFixtures: Record<string, Buffer> = {};
 
 /** Serves the fixture with range support, plus redirects. */
 function serve(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -40,7 +41,8 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     res.writeHead(302, { location: "/episode.mp3" }).end();
     return;
   }
-  const file = req.url === "/long.mp3" ? longFixture : req.url === "/episode.mp3" ? fixture : null;
+  const name = (req.url ?? "").slice(1).split("?")[0];
+  const file = name === "long.mp3" ? longFixture : name === "episode.mp3" ? fixture : (beepFixtures[name] ?? null);
   if (!file) {
     res.writeHead(404).end();
     return;
@@ -55,14 +57,34 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
       "content-length": end - start + 1,
       "content-range": `bytes ${start}-${end}/${file.length}`,
     });
-    const body = file.subarray(start, end + 1);
-    res.write(body, () => (bytesServed += body.length));
-    res.end();
+    res.end(file.subarray(start, end + 1));
   } else {
     res.writeHead(200, { "content-type": "audio/mpeg", "accept-ranges": "bytes", "content-length": file.length });
-    res.write(file, () => (bytesServed += file.length));
-    res.end();
+    res.end(file);
   }
+}
+
+/** Seconds into a FLAC buffer where the 3 kHz beep starts (Goertzel over 10 ms frames). */
+function beepAt(flac: Buffer): number | null {
+  const pcm = spawnSync(ffmpegPath, ["-v", "error", "-i", "pipe:0", "-f", "s16le", "-ac", "1", "-ar", "16000", "pipe:1"], {
+    input: flac,
+    maxBuffer: 64 * 1024 * 1024,
+  }).stdout;
+  const samples = new Int16Array(pcm.buffer, pcm.byteOffset, pcm.length / 2);
+  const coeff = 2 * Math.cos((2 * Math.PI * 3000) / 16000);
+  const power: number[] = [];
+  for (let i = 0; i + 160 <= samples.length; i += 160) {
+    let s1 = 0;
+    let s2 = 0;
+    for (let j = 0; j < 160; j++) {
+      const s0 = samples[i + j] + coeff * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    power.push(s1 * s1 + s2 * s2 - coeff * s1 * s2);
+  }
+  const max = Math.max(...power);
+  return max ? (power.findIndex((p) => p > max * 0.3) * 160) / 16000 : null;
 }
 
 /** Seconds of audio in a FLAC buffer, by decoding it to 16 kHz mono 16-bit PCM. */
@@ -88,6 +110,22 @@ beforeAll(async () => {
     "-ac", "1", "-ar", "22050", "-c:a", "libmp3lame", "-b:a", "64k", long,
   ]);
   longFixture = fs.readFileSync(long);
+  const beepSource = path.join(dir, "beep.wav");
+  execFileSync(ffmpegPath, [
+    "-v", "error",
+    "-f", "lavfi", "-i", "anoisesrc=d=120:c=pink:a=0.3",
+    "-f", "lavfi", "-i", "aevalsrc='0.6*sin(2*PI*3000*t)*between(t,100,100.2)':d=120:s=44100",
+    "-filter_complex", "[0]volume='if(lt(mod(t,20),10),1,0.05)':eval=frame[bg];[bg][1]amix=inputs=2",
+    beepSource,
+  ]);
+  for (const [name, args] of [
+    ["beep-cbr.mp3", ["-c:a", "libmp3lame", "-b:a", "128k"]],
+    ["beep-vbr.mp3", ["-c:a", "libmp3lame", "-q:a", "2", "-write_xing", "0"]],
+  ] as const) {
+    const out = path.join(dir, name);
+    execFileSync(ffmpegPath, ["-v", "error", "-i", beepSource, ...args, out]);
+    beepFixtures[name] = fs.readFileSync(out);
+  }
   server = http.createServer(serve);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
@@ -101,7 +139,6 @@ afterAll(() => {
 
 beforeEach(() => {
   requests = [];
-  bytesServed = 0;
   guard.allow = () => true;
 });
 
@@ -122,14 +159,33 @@ describe("extractWindow", () => {
     expect(flacSeconds(flac)).toBeCloseTo(5, 1);
   });
 
-  // Known gap (PRODUCTION_PLAN.md #21): ffmpeg's MP3 demuxer seeks by reading
-  // from the start unless fast seeking is on, so every window downloads the
-  // whole episode up to it. Fast seeking trades that for estimated offsets.
-  it.fails("seeks with range requests instead of downloading everything before the window", async () => {
+  it("seeks constant-bitrate MP3 with range requests instead of downloading everything before the window", async () => {
     await extractWindow(`${base}/long.mp3`, 100, 5);
-    expect(requests.some((r) => r.range && r.range !== "bytes=0-")).toBe(true);
-    // The window starts 100 s into 120 s of audio.
-    expect(bytesServed).toBeLessThan(longFixture.length * 0.5);
+    // A window at 100 s of 120 s: ffmpeg asks for bytes from well past the middle.
+    const starts = requests.map((r) => Number(r.range?.match(/^bytes=(\d+)-$/)?.[1] ?? 0));
+    expect(Math.max(...starts)).toBeGreaterThan(longFixture.length * 0.5);
+  });
+
+  it.each([
+    ["beep-cbr.mp3", "jumps straight to the window"],
+    ["beep-vbr.mp3", "reads from the start"],
+  ])("places the window exactly in %s (it %s)", async (name) => {
+    const flac = await extractWindow(`${base}/${name}?exact=${Math.random()}`, 95, 10);
+    expect(Math.abs((beepAt(flac) ?? Infinity) - 5)).toBeLessThan(0.1);
+    const offsetRanges = requests.filter((r) => r.range && !/^bytes=0-\d*$/.test(r.range));
+    if (name === "beep-cbr.mp3") expect(offsetRanges.length).toBeGreaterThan(0);
+    else expect(offsetRanges).toEqual([]);
+  });
+
+  it("doesn't probe the file for the first window, and probes each file once", async () => {
+    const url = `${base}/beep-cbr.mp3?probe=${Math.random()}`;
+    await extractWindow(url, 0, 2);
+    const probes = () => requests.filter((r) => r.range && /^bytes=0-\d+$/.test(r.range)).length;
+    expect(probes()).toBe(0);
+    await extractWindow(url, 60, 2);
+    expect(probes()).toBe(1);
+    await extractWindow(url, 90, 2);
+    expect(probes()).toBe(1);
   });
 
   it("gives up on a host that stops sending", async () => {
