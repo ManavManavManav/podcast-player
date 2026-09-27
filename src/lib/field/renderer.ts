@@ -5,6 +5,9 @@
  *
  * The loop sleeps when the tab is hidden or the field isn't wanted, and with
  * reduced motion draws a still that changes every ten seconds.
+ *
+ * It doesn't follow the mouse (that read as the drawing trailing the cursor);
+ * a focus point drifts slowly by itself instead. Clicks and taps still poke it.
  */
 
 import { createPrinciple, principleFor, type DrawStyle, type Frame, type Principle } from "@/lib/field/principles";
@@ -16,8 +19,6 @@ import { usePlayback, usePlayer } from "@/store/player";
 export type FieldVariant = "page" | "stage";
 
 const STILL_MS = 10_000;
-/** After this long without the pointer moving, the drawing wanders on its own. */
-const IDLE_MS = 10_000;
 
 const ease = (value: number, target: number, tau: number, dt: number) => value + (target - value) * (1 - Math.exp(-dt / tau));
 
@@ -42,7 +43,6 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
   const ctx = canvas.getContext("2d");
   if (!ctx) return () => {};
   const stage = variant === "stage";
-  const frameMs = stage ? 0 : 33; // the background runs at 30 fps, the Stage as fast as it can
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const darkMode = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -53,16 +53,16 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
   let dpr = 1;
   let principle: Principle | null = null;
   let key = "";
-  const pointer: Pointer = { x: 0, y: 0, presence: 0 };
-  const target = { x: 0, y: 0, presence: 0 };
-  let lastMove = -Infinity;
+  /** The drifting focus point the drawings bend around (not the mouse). */
+  const pointer: Pointer = { x: 0, y: 0, presence: 0.35 };
   let shown = 0;
   let lastFrame = 0;
   let handle: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const resize = () => {
-    dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2);
+    // The faint background doesn't need retina sharpness; a quarter of the pixels keeps it smooth.
+    dpr = stage ? Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2) : 1;
     width = window.innerWidth;
     height = window.innerHeight;
     canvas.width = Math.round(width * dpr);
@@ -88,14 +88,8 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
     const time = audio && !Number.isNaN(audio.currentTime) ? audio.currentTime : currentTime;
     const s = signal.step({ time, playing, envelopes, segments, ads }, dt);
 
-    if (now - lastMove > IDLE_MS) {
-      target.x = width * (0.5 + 0.32 * Math.sin(t * 0.11));
-      target.y = height * (0.5 + 0.3 * Math.sin(t * 0.07 + 1.3));
-      target.presence = 0.55;
-    }
-    pointer.x = ease(pointer.x, target.x, 0.25, dt);
-    pointer.y = ease(pointer.y, target.y, 0.25, dt);
-    pointer.presence = ease(pointer.presence, target.presence, 0.6, dt);
+    pointer.x = width * (0.5 + 0.32 * Math.sin(t * 0.05));
+    pointer.y = height * (0.5 + 0.3 * Math.sin(t * 0.037 + 1.3));
 
     const frame: Frame = { t, dt, signal: s, pointer, width, height, intensity: 0.5 + fieldIntensity };
     principle!.step(frame);
@@ -111,7 +105,7 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
     } else {
       style = {
         ink: s.inAd ? colors.ad : colors.ink,
-        alpha: shown * (0.06 + (0.08 + 0.12 * s.level) * (0.4 + fieldIntensity)),
+        alpha: shown * (0.03 + (0.05 + 0.06 * s.level) * (0.4 + fieldIntensity)),
         weight: 1,
       };
     }
@@ -123,11 +117,7 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
   const tick = (now: number) => {
     handle = null;
     if (document.hidden) return;
-    const dt = Math.min(0.1, (now - lastFrame) / 1000);
-    if (!reducedMotion.matches && now - lastFrame < frameMs) {
-      handle = requestAnimationFrame(tick);
-      return;
-    }
+    const dt = Math.max(0, Math.min(0.1, (now - lastFrame) / 1000));
     lastFrame = now;
     const on = wanted();
     shown = reducedMotion.matches ? Number(on) : ease(shown, on ? 1 : 0, stage ? 0.25 : 0.4, dt);
@@ -147,20 +137,10 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
     if (timer !== null && !force) return;
     if (timer !== null) clearTimeout(timer);
     timer = null;
-    lastFrame = performance.now() - 33;
+    lastFrame = performance.now() - 16;
     handle = requestAnimationFrame(tick);
   };
 
-  const onPointerMove = (e: PointerEvent) => {
-    if (e.pointerType === "touch") return;
-    target.x = e.clientX;
-    target.y = e.clientY;
-    target.presence = 1;
-    lastMove = performance.now();
-  };
-  const onPointerOut = (e: PointerEvent) => {
-    if (!e.relatedTarget) target.presence = 0;
-  };
   // A tap or click pokes the drawing (a ripple, a ring, a new column…).
   const onPointerDown = (e: PointerEvent) => {
     if (handle === null || !principle) return;
@@ -178,8 +158,6 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
   };
 
   resize();
-  target.x = pointer.x = width / 2;
-  target.y = pointer.y = height / 2;
   const unsubscribe = [
     usePlayer.subscribe(() => wake()),
     usePlayback.subscribe((s, prev) => {
@@ -187,9 +165,7 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
     }),
   ];
   window.addEventListener("resize", onResize);
-  window.addEventListener("pointermove", onPointerMove, { passive: true });
   window.addEventListener("pointerdown", onPointerDown, { passive: true });
-  document.addEventListener("pointerout", onPointerOut);
   document.addEventListener("visibilitychange", onWake);
   darkMode.addEventListener("change", onColorScheme);
   reducedMotion.addEventListener("change", onWake);
@@ -200,9 +176,7 @@ export function startField(canvas: HTMLCanvasElement, variant: FieldVariant, wan
     if (handle !== null) cancelAnimationFrame(handle);
     if (timer !== null) clearTimeout(timer);
     window.removeEventListener("resize", onResize);
-    window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerdown", onPointerDown);
-    document.removeEventListener("pointerout", onPointerOut);
     document.removeEventListener("visibilitychange", onWake);
     darkMode.removeEventListener("change", onColorScheme);
     reducedMotion.removeEventListener("change", onWake);

@@ -44,7 +44,9 @@ function EpisodeRow({ episode, list }: { episode: Episode; list: Episode[] }) {
   ].filter(Boolean);
 
   return (
-    <li className="hover-wave group relative flex gap-4 overflow-hidden py-5">
+    // Inset a little on each side (and pulled back out by the same amount), so the play
+    // button's hover scale isn't clipped by the row, which clips its sheen.
+    <li className="hover-wave group relative -mx-2 flex gap-4 overflow-hidden px-2 py-5">
       <button
         ref={playButton}
         onClick={onClick}

@@ -89,7 +89,7 @@ function onsetEdge() {
 
 function createGrain(seed: number, width: number, height: number, bold: boolean): Principle {
   const rand = random(seed ^ 0x51ed);
-  const spacing = bold ? (width < 768 ? 34 : 40) : width < 768 ? 28 : 24;
+  const spacing = bold ? (width < 768 ? 34 : 40) : width < 768 ? 32 : 30;
   const layout: GrainLayout = layoutGrain(seed, width, height, spacing);
   const buffer = new Float32Array(layout.cols * layout.rows * 4);
   let ripples: Ripple[] = [];
