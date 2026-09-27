@@ -1,8 +1,9 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
 import { authClient } from "@/lib/authClient";
 import { safeNext } from "@/lib/redirect";
 
@@ -68,15 +69,15 @@ export function AuthForm({
         <>
           <div className="mt-6 grid gap-2">
             {socialProviders.map((provider) => (
-              <button
+              <Button
                 key={provider}
-                type="button"
+                variant="outline"
                 disabled={pending}
                 onClick={() => authClient.signIn.social({ provider, callbackURL: destination })}
-                className="hover-breathe h-11 rounded-full border border-accent text-sm font-medium disabled:opacity-60 [--hover-scale:1.02]"
+                className="[--hover-scale:1.02]"
               >
                 Continue with {PROVIDER_LABELS[provider]}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="my-5 flex items-center gap-3 text-xs text-faint">
@@ -88,22 +89,22 @@ export function AuthForm({
       <form onSubmit={submit} className={`grid gap-3.5 ${socialProviders.length ? "" : "mt-6"}`}>
         {signup && (
           <Field label="Name">
-            <input required aria-label="Name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+            <Input required aria-label="Name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
         )}
         <Field label="Email">
-          <input
+          <Input
             required
             aria-label="Email"
             type="email"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
+           
           />
         </Field>
         <Field label="Password" hint={signup ? "At least 10 characters" : undefined}>
-          <input
+          <Input
             required
             aria-label="Password"
             type="password"
@@ -111,19 +112,19 @@ export function AuthForm({
             autoComplete={signup ? "new-password" : "current-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
+           
           />
         </Field>
 
         {signup && askForSetupCode && (
           <Field label="Setup code" hint="PODBLOCK_SETUP_CODE on the server">
-            <input
+            <Input
               required
               aria-label="Setup code"
               autoComplete="off"
               value={setupCode}
               onChange={(e) => setSetupCode(e.target.value)}
-              className={inputClass}
+             
             />
           </Field>
         )}
@@ -134,14 +135,9 @@ export function AuthForm({
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="hover-breathe mt-2 flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-body font-medium text-accent-text disabled:opacity-60 [--hover-scale:1.02]"
-        >
-          {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
+        <Button type="submit" size="lg" loading={pending} className="mt-2 [--hover-scale:1.02]">
           {signup ? "Create account" : "Sign in"}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-5 text-center text-sm text-muted">
@@ -162,21 +158,6 @@ export function AuthForm({
         )}
       </p>
     </div>
-  );
-}
-
-const inputClass =
-  "h-11 w-full rounded-full bg-bg px-4 text-sm text-text transition focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="grid gap-1.5">
-      <span className="flex items-baseline justify-between text-sm font-medium">
-        {label}
-        {hint && <span className="text-xs font-normal text-faint">{hint}</span>}
-      </span>
-      {children}
-    </label>
   );
 }
 

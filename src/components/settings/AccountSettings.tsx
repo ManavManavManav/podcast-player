@@ -1,7 +1,9 @@
 "use client";
 
-import { Check, CircleAlert, LoaderCircle } from "lucide-react";
+import { Check, CircleAlert } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
 import { authClient } from "@/lib/authClient";
 
 export function AccountSettings({ name, email }: { name: string; email: string }) {
@@ -44,34 +46,29 @@ export function AccountSettings({ name, email }: { name: string; email: string }
 
       <form onSubmit={changePassword} className="mt-6 grid max-w-sm gap-3">
         <h3 className="font-serif text-xl">Change password</h3>
-        <input
+        <Input
           type="password"
           required
           autoComplete="current-password"
           placeholder="Current password"
+          aria-label="Current password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
-          className="h-11 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
-        <input
+        <Input
           type="password"
           required
           minLength={10}
           autoComplete="new-password"
           placeholder="New password (10+ characters)"
+          aria-label="New password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
-          className="h-11 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
         />
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="submit"
-            disabled={busy}
-            className="hover-breathe flex h-11 items-center gap-2 rounded-full bg-accent px-6 text-sm font-medium text-accent-text disabled:opacity-50 [--hover-scale:1.04]"
-          >
-            {busy && <LoaderCircle className="size-4 animate-spin" />}
+          <Button type="submit" loading={busy}>
             Change password
-          </button>
+          </Button>
           {status && (
             <p className={`flex items-center gap-1.5 text-sm ${status.kind === "ok" ? "text-accent" : "text-danger"}`}>
               {status.kind === "ok" ? <Check className="size-4" /> : <CircleAlert className="size-4" />}

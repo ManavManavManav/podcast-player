@@ -23,6 +23,7 @@ import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { BAR_FADE_MS, BAR_REVEAL_MS, burstInProgress } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Timeline } from "@/components/player/Timeline";
+import { IconButton } from "@/components/ui/IconButton";
 import { useAdScanner } from "@/hooks/useAdScanner";
 import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { formatClock } from "@/lib/text";
@@ -392,7 +393,7 @@ function PlayerBar() {
         </div>
 
         <div className="flex items-center gap-0.5 sm:gap-1.5">
-          <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="hidden sm:grid">
+          <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="max-sm:hidden">
             <RotateCcw className="size-[18px]" />
             <span className="absolute text-[8px] font-bold">{BACK_SECONDS}</span>
           </IconButton>
@@ -409,7 +410,7 @@ function PlayerBar() {
               <Play className="ml-0.5 size-5 fill-current" />
             )}
           </button>
-          <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="hidden sm:grid">
+          <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="max-sm:hidden">
             <RotateCw className="size-[18px]" />
             <span className="absolute text-[8px] font-bold">{FORWARD_SECONDS}</span>
           </IconButton>
@@ -558,29 +559,6 @@ function VolumeControl() {
         className="h-1 w-20 cursor-pointer accent-[var(--accent)]"
       />
     </div>
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-  className = "grid",
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={`hover-breathe relative size-9 place-items-center rounded-full text-text hover:bg-surface-2 ${className}`}
-    >
-      {children}
-    </button>
   );
 }
 

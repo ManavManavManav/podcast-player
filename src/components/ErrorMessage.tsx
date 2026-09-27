@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+
 /**
  * What error boundaries show. Server errors reach the browser without their
  * message (Next.js withholds it in production); the digest matches the
@@ -14,9 +16,9 @@ export function ErrorMessage({ error, retry }: { error: Error & { digest?: strin
         answer.
       </p>
       {/* Re-fetches the page from the server; reset() would only re-render the failed result. */}
-      <button onClick={retry} className="mt-6 rounded-full bg-accent px-5 py-2 text-sm font-medium text-accent-text">
+      <Button onClick={retry} className="mt-6">
         Try again
-      </button>
+      </Button>
       {error.digest && <p className="mt-6 font-mono text-xs text-faint">Reference: {error.digest}</p>}
     </div>
   );

@@ -1,7 +1,9 @@
 "use client";
 
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Field";
 import type { AdminUser } from "@/lib/types";
 
 type Action = "approve" | "disable" | "enable" | "delete" | "set-password";
@@ -63,17 +65,16 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
         {users.map((user) => {
           const self = user.id === selfId;
           const button = (action: Action, label: string, danger = false) => (
-            <button
+            <Button
               key={action}
+              size="sm"
+              variant={danger ? "danger" : "subtle"}
               onClick={() => act(user, action)}
               disabled={busy !== null}
-              className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium disabled:opacity-50 ${
-                danger ? "border-danger/40 text-danger hover:bg-danger/10" : "border-border hover:bg-surface-2"
-              }`}
+              loading={busy === `${user.id}:${action}`}
             >
-              {busy === `${user.id}:${action}` && <LoaderCircle className="size-3 animate-spin" />}
               {label}
-            </button>
+            </Button>
           );
 
           return (
@@ -97,14 +98,15 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                 <div className="flex flex-wrap gap-2">
                   {!user.approved && [button("approve", "Approve"), button("delete", "Reject", true)]}
                   {user.approved && !user.banned && user.role !== "admin" && [
-                    <button
+                    <Button
                       key="password"
+                      size="sm"
+                      variant="subtle"
                       onClick={() => setPasswordFor(passwordFor === user.id ? null : user.id)}
                       disabled={busy !== null}
-                      className="h-8 rounded-full border border-border px-3 text-xs font-medium hover:bg-surface-2 disabled:opacity-50"
                     >
                       Set password
-                    </button>,
+                    </Button>,
                     button("disable", "Disable"),
                     button("delete", "Delete", true),
                   ]}
@@ -120,31 +122,29 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
                   }}
                   className="flex w-full flex-wrap items-center gap-2"
                 >
-                  <input
+                  <Input
                     type={showPassword ? "text" : "password"}
                     required
                     minLength={10}
                     autoComplete="new-password"
                     placeholder="New password (10+ characters)"
+                    aria-label={`New password for ${user.email}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-10 min-w-0 flex-1 rounded-full bg-bg px-4 text-sm focus:outline-none focus-visible:outline-2 focus-visible:outline-accent"
+                    className="h-10 w-auto min-w-0 flex-1"
                   />
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="subtle"
                     onClick={() => setShowPassword((shown) => !shown)}
                     aria-pressed={showPassword}
-                    className="h-10 rounded-full border border-border px-4 text-xs font-medium hover:bg-surface-2"
+                    className="h-10 px-4"
                   >
                     {showPassword ? "Hide" : "Show"}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={busy !== null}
-                    className="h-10 rounded-full bg-accent px-5 text-xs font-medium text-accent-text disabled:opacity-50"
-                  >
+                  </Button>
+                  <Button type="submit" size="sm" disabled={busy !== null} className="h-10 px-5">
                     Save
-                  </button>
+                  </Button>
                 </form>
               )}
             </li>

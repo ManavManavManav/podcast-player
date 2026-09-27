@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/authClient";
+import { Button } from "@/components/ui/Button";
 
 export function SignOutButton() {
   const signOut = async () => {
@@ -9,11 +10,8 @@ export function SignOutButton() {
     window.location.assign("/login");
   };
   return (
-    <button
-      onClick={signOut}
-      className="hover-breathe h-11 rounded-full border border-accent px-6 text-sm font-medium [--hover-scale:1.04]"
-    >
+    <Button variant="outline" onClick={signOut}>
       Sign out
-    </button>
+    </Button>
   );
 }

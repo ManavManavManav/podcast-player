@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { buttonStyles } from "@/components/ui/Button";
 import { currentUser } from "@/lib/server/session";
 
 export const metadata: Metadata = { title: "Waiting for approval" };
@@ -23,7 +24,7 @@ export default async function PendingPage() {
       <div className="mt-6 flex items-center justify-center gap-3">
         <Link
           href="/"
-          className="hover-breathe flex h-11 items-center rounded-full bg-accent px-6 text-sm font-medium text-accent-text [--hover-scale:1.04]"
+          className={buttonStyles()}
         >
           Check again
         </Link>
