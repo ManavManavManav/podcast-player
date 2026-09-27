@@ -8,31 +8,43 @@ import { formatDuration } from "@/lib/text";
 import type { Episode } from "@/lib/types";
 import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
 
-/** The hero's buttons, plus the listener's running total of time saved. */
-export function HeroActions() {
+/** The top of the home page: what Podblock has saved you so far, and where to go next. */
+export function HomeSummary() {
   const latest = usePlayer((s) => s.recent[0]);
   const stats = usePlayer((s) => s.stats);
   const play = usePlayer((s) => s.play);
 
   return (
-    <>
-      <div className="mt-9 flex flex-wrap justify-center gap-3">
-        <Link href="/search" className={buttonStyles({ size: "lg" })}>
+    <section aria-label="Your listening" className="flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-2 sm:pt-6">
+      {stats.adsSkipped > 0 ? (
+        <dl className="flex gap-10">
+          <Stat label={stats.adsSkipped === 1 ? "Ad skipped" : "Ads skipped"} value={String(stats.adsSkipped)} />
+          <Stat label="Time saved" value={formatDuration(stats.secondsSaved)} />
+        </dl>
+      ) : (
+        <p className="max-w-md text-sm text-muted">Play an episode and Podblock skips its ads. What it saves you adds up here.</p>
+      )}
+      <div className="flex max-w-full flex-wrap gap-3">
+        <Link href="/search" className={buttonStyles()}>
           Find a show <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
         {latest && (
-          <button onClick={() => play(latest)} className={`${buttonStyles({ variant: "outline", size: "lg" })} max-w-full`}>
+          <button onClick={() => play(latest)} className={`${buttonStyles({ variant: "outline" })} max-w-full`}>
             <span className="truncate">Resume {latest.title}</span>
             <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
           </button>
         )}
       </div>
-      {stats.adsSkipped > 0 && (
-        <p className="mt-6 font-mono text-meta text-faint">
-          {stats.adsSkipped} {stats.adsSkipped === 1 ? "ad" : "ads"} skipped · {formatDuration(stats.secondsSaved)} saved
-        </p>
-      )}
-    </>
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col-reverse gap-1">
+      <dt className="text-xs uppercase text-muted">{label}</dt>
+      <dd className="font-serif text-4xl leading-none tracking-display sm:text-5xl">{value}</dd>
+    </div>
   );
 }
 

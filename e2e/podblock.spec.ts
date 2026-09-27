@@ -26,14 +26,14 @@ async function signIn(page: Page, who: typeof OWNER) {
   await page.getByLabel("Email").fill(who.email);
   await page.getByLabel("Password", { exact: true }).fill(who.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("heading", { name: /Podcasts,\s*minus the ads/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Trending now" })).toBeVisible();
 }
 
 const playhead = (page: Page) => page.locator("audio").evaluate((audio: HTMLAudioElement) => audio.currentTime);
 
 test("the owner signs up first, with the setup code, and approves a friend", async ({ browser }) => {
   const owner = await signUp(browser, OWNER, "e2e-setup-code");
-  await expect(owner.getByRole("heading", { name: /Podcasts,\s*minus the ads/ })).toBeVisible();
+  await expect(owner.getByRole("heading", { name: "Trending now" })).toBeVisible();
 
   const friend = await signUp(browser, FRIEND);
   await expect(friend.getByRole("heading", { name: "Waiting for approval" })).toBeVisible();
@@ -43,7 +43,7 @@ test("the owner signs up first, with the setup code, and approves a friend", asy
   await expect(owner.getByText("Active")).toBeVisible();
 
   await friend.getByRole("link", { name: "Check again" }).click();
-  await expect(friend.getByRole("heading", { name: /Podcasts,\s*minus the ads/ })).toBeVisible();
+  await expect(friend.getByRole("heading", { name: "Trending now" })).toBeVisible();
 });
 
 test("ads are found ahead of the listener, skipped, and can be undone", async ({ page }) => {
