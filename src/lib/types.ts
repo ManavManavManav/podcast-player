@@ -69,6 +69,8 @@ export interface AnalyzeResponse {
   cached: boolean;
   /** The audio ends before this window: there's nothing more to analyze. */
   end?: boolean;
+  /** This window's loudness envelope (lib/envelope.ts), when it was measured. */
+  envelope?: string;
 }
 
 /** Response of GET /api/analyze: everything already analyzed for an episode. */
@@ -76,6 +78,8 @@ export interface CachedAnalysis {
   windows: number[];
   segments: TranscriptSegment[];
   ads: AdRange[];
+  /** Loudness envelopes by window start, for the windows that have one. */
+  envelopes?: Record<number, string>;
 }
 
 export interface HealthResponse {

@@ -46,4 +46,17 @@ describe("analysis store", () => {
     expect(adAt(ads, 20)).toBeUndefined();
     expect(adAt(ads, 35)).toEqual(ads[1]);
   });
+
+  it("keeps each window's loudness envelope, decoded, from fresh and cached results", () => {
+    const s = useAnalysis.getState();
+    s.reset("https://a/ep.mp3");
+    s.addWindow(0, [], [], "AQID"); // bytes 1, 2, 3
+    expect([...useAnalysis.getState().envelopes[0]]).toEqual([1, 2, 3]);
+    s.restore({ windows: [0, 300], segments: [], ads: [], envelopes: { 0: "BAUG", 300: "BwgJ" } });
+    // A window already in memory keeps its envelope; new ones are added.
+    expect([...useAnalysis.getState().envelopes[0]]).toEqual([1, 2, 3]);
+    expect([...useAnalysis.getState().envelopes[300]]).toEqual([7, 8, 9]);
+    s.reset("https://a/other.mp3");
+    expect(useAnalysis.getState().envelopes).toEqual({});
+  });
 });

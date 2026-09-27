@@ -14,6 +14,9 @@ vi.mock("@/lib/server/audio", async (importOriginal) => ({
 }));
 vi.mock("@/lib/server/transcribe", () => ({ transcribe: steps.transcribe }));
 vi.mock("@/lib/server/llm/detect", () => ({ detectAds: steps.detectAds }));
+// Measured with ffmpeg in real use; here the stub audio isn't decodable, so it's stubbed too.
+const envelope = vi.hoisted(() => ({ envelopeFor: vi.fn() }));
+vi.mock("@/lib/server/envelope", () => ({ envelopeFor: envelope.envelopeFor }));
 
 const { analyzeWindow, cachedAnalysis } = await import("@/lib/server/analyzer");
 const { AppError } = await import("@/lib/server/errors");
@@ -30,6 +33,7 @@ beforeEach(() => {
   vi.stubEnv("DETECT_API_KEY", "sk-detect");
   vi.stubEnv("TRANSCRIBE_API_KEY", "sk-transcribe");
   steps.extractWindow.mockResolvedValue(Buffer.from("flac"));
+  envelope.envelopeFor.mockResolvedValue(null);
   steps.transcribe.mockImplementation(async (_audio: Buffer, start: number) => ({ segments: segmentsAt(start), audioSeconds: 300 }));
   steps.detectAds.mockImplementation(async (window: Array<{ start: number }>) => ({
     ads: [{ start: window[0].start, end: window[0].start + 30, confidence: 0.9, reason: "Ad: Acme" }],
@@ -336,5 +340,26 @@ describe("reading what's stored", () => {
     expect(transcriptsRead).toBeLessThanOrEqual(3);
     expect(execute.mock.calls.length).toBeLessThanOrEqual(3);
     execute.mockRestore();
+  });
+});
+
+describe("loudness envelopes", () => {
+  it("are measured with the transcription, stored, and returned fresh and cached", async () => {
+    const url = "https://cdn.example.com/envelope.mp3";
+    envelope.envelopeFor.mockResolvedValue("AAECAwQF");
+    const first = await analyzeWindow(url, 0, "en", {}, "user-1");
+    expect(first.envelope).toBe("AAECAwQF");
+    expect(envelope.envelopeFor).toHaveBeenCalledWith(Buffer.from("flac"), expect.any(AbortSignal));
+
+    const again = await analyzeWindow(url, 0, "en", {}, "user-1");
+    expect(again).toEqual({ ...first, cached: true });
+    expect((await cachedAnalysis(url)).envelopes).toEqual({ 0: "AAECAwQF" });
+  });
+
+  it("are left out when they couldn't be measured", async () => {
+    const url = "https://cdn.example.com/no-envelope.mp3";
+    const result = await analyzeWindow(url, 0, "en", {}, "user-1");
+    expect(result).not.toHaveProperty("envelope");
+    expect(await cachedAnalysis(url)).not.toHaveProperty("envelopes");
   });
 });

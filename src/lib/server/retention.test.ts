@@ -35,6 +35,10 @@ describe("cleanupOldData", () => {
         // Recent verdict whose (old) transcript is going: it goes too.
         { sql: "INSERT INTO analysis_window VALUES ('mixed', 0, 'u', '[]', ?)", args: [old] },
         { sql: "INSERT INTO analysis_verdict VALUES ('mixed', 0, 'd2', '[]', ?)", args: [recent] },
+        // Envelopes go with their window: an old one, a recent one, and a recent one whose window is going.
+        { sql: "INSERT INTO analysis_envelope VALUES ('old', 0, 'AA==', ?)", args: [old] },
+        { sql: "INSERT INTO analysis_envelope VALUES ('new', 0, 'AA==', ?)", args: [recent] },
+        { sql: "INSERT INTO analysis_envelope VALUES ('mixed', 0, 'AA==', ?)", args: [recent] },
         `INSERT INTO "user" (id, name, email, "emailVerified", approved, "createdAt", "updatedAt") VALUES ('u1', 'U', 'u@example.com', 0, 0, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`,
         `INSERT INTO session (id, "expiresAt", token, "createdAt", "updatedAt", "userId") VALUES ('s-old', '${new Date(NOW - DAY).toISOString()}', 't1', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 'u1')`,
         `INSERT INTO session (id, "expiresAt", token, "createdAt", "updatedAt", "userId") VALUES ('s-live', '${new Date(NOW + DAY).toISOString()}', 't2', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 'u1')`,
@@ -49,6 +53,8 @@ describe("cleanupOldData", () => {
     expect(removed).toEqual({ windows: 2, verdicts: 2, sessions: 1, verifications: 1, rateLimits: 1 });
     expect(await count("SELECT COUNT(*) n FROM analysis_window WHERE url_key = 'new'")).toBe(1);
     expect(await count("SELECT COUNT(*) n FROM analysis_verdict WHERE url_key = 'new'")).toBe(1);
+    expect(await count("SELECT url_key, COUNT(*) n FROM analysis_envelope")).toBe(1);
+    expect(await count("SELECT COUNT(*) n FROM analysis_envelope WHERE url_key = 'new'")).toBe(1);
     expect(await count("SELECT COUNT(*) n FROM session WHERE id = 's-live'")).toBe(1);
     expect(await count(`SELECT COUNT(*) n FROM "rateLimit" WHERE id = 'r-new'`)).toBe(1);
 

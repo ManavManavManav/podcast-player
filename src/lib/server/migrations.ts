@@ -47,6 +47,17 @@ export const APP_MIGRATIONS: ReadonlyArray<readonly string[]> = [
   ],
   // Left behind by the version that stored users' own API keys.
   [`DROP TABLE IF EXISTS user_settings`],
+  // A window's loudness envelope, for the audio-reactive background (lib/server/envelope.ts).
+  // Its own table rather than a column: ADD COLUMN can't be made idempotent in SQLite.
+  [
+    `CREATE TABLE IF NOT EXISTS analysis_envelope (
+      url_key TEXT NOT NULL,
+      start INTEGER NOT NULL,
+      envelope TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (url_key, start)
+    )`,
+  ],
 ];
 
 const VERSION_TABLE = `CREATE TABLE IF NOT EXISTS schema_version (

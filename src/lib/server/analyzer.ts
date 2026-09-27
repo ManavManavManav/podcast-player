@@ -3,6 +3,7 @@ import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { mergeRanges, snapToSpeech } from "@/lib/ads/merge";
 import type { AdRange, AnalyzeResponse, CachedAnalysis, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import { extractWindow, hasAudioFrames } from "@/lib/server/audio";
+import { envelopeFor } from "@/lib/server/envelope";
 import { detectConfig, transcribeConfig, type ApiConfig } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db";
 import { AppError } from "@/lib/server/errors";
@@ -119,8 +120,9 @@ async function storedVerdict(urlKey: string, start: number, detector: string): P
 async function episodeAnalysis(urlKey: string, detector: string) {
   const db = await getDb();
   const { rows } = await db.execute({
-    sql: `SELECT w.start, w.segments, v.ads FROM analysis_window w
+    sql: `SELECT w.start, w.segments, v.ads, e.envelope FROM analysis_window w
           JOIN analysis_verdict v ON v.url_key = w.url_key AND v.start = w.start AND v.detector = ?
+          LEFT JOIN analysis_envelope e ON e.url_key = w.url_key AND e.start = w.start
           WHERE w.url_key = ? ORDER BY w.start`,
     args: [detector, urlKey],
   });
@@ -129,15 +131,24 @@ async function episodeAnalysis(urlKey: string, detector: string) {
   const found = rows.flatMap((row) => JSON.parse(String(row.ads)) as AdRange[]);
   // Ads split across a window boundary become one; skips land where speech resumes.
   const ads = snapToSpeech(mergeRanges(found, 2), segments);
-  return { windows, segments, ads };
+  const measured = rows.filter((row) => row.envelope != null);
+  return {
+    windows,
+    segments,
+    ads,
+    ...(measured.length > 0 && {
+      envelopes: Object.fromEntries(measured.map((row) => [Number(row.start), String(row.envelope)])),
+    }),
+  };
 }
 
 /** One window's transcript and this detector's verdict, in one read. */
 async function storedWindow(urlKey: string, start: number, detector: string) {
   const db = await getDb();
   const { rows } = await db.execute({
-    sql: `SELECT w.segments, v.ads FROM analysis_window w
+    sql: `SELECT w.segments, v.ads, e.envelope FROM analysis_window w
           LEFT JOIN analysis_verdict v ON v.url_key = w.url_key AND v.start = w.start AND v.detector = ?
+          LEFT JOIN analysis_envelope e ON e.url_key = w.url_key AND e.start = w.start
           WHERE w.url_key = ? AND w.start = ?`,
     args: [detector, urlKey, start],
   });
@@ -145,6 +156,7 @@ async function storedWindow(urlKey: string, start: number, detector: string) {
   return {
     segments: row ? (JSON.parse(String(row.segments)) as TranscriptSegment[]) : null,
     ads: row?.ads != null ? (JSON.parse(String(row.ads)) as AdRange[]) : null,
+    envelope: row?.envelope != null ? String(row.envelope) : null,
   };
 }
 
@@ -179,7 +191,7 @@ async function transcribeWindow(
   language: string | undefined,
   userId: string,
   signal?: AbortSignal,
-): Promise<{ segments: TranscriptSegment[]; end: boolean }> {
+): Promise<{ segments: TranscriptSegment[]; end: boolean; envelope: string | null }> {
   const config = transcribeConfig();
   if (!config) throw new AppError("config", "Transcription isn't configured on this server (TRANSCRIBE_API_KEY)");
 
@@ -188,16 +200,20 @@ async function transcribeWindow(
     async (taskSignal) => {
       // Another request may have finished this window since the caller looked.
       const done = await storedSegments(urlKey, start);
-      if (done) return { segments: done, end: false };
+      if (done) return { segments: done, end: false, envelope: null };
       const began = performance.now();
       const audio = await extractWindow(url, start, WINDOW_SECONDS, taskSignal);
       const extracted = performance.now();
       // Past the end of the file: nothing to pay for, and nothing worth storing.
       if (!hasAudioFrames(audio)) {
         log.info("analysis.end_of_audio", { urlKey, window: start });
-        return { segments: [], end: true };
+        return { segments: [], end: true, envelope: null };
       }
-      const { segments, audioSeconds } = await transcribe(audio, start, WINDOW_SECONDS, language, config, taskSignal);
+      // Measured locally while the transcription request is in flight; never fails the analysis.
+      const [{ segments, audioSeconds }, envelope] = await Promise.all([
+        transcribe(audio, start, WINDOW_SECONDS, language, config, taskSignal),
+        envelopeFor(audio, taskSignal),
+      ]);
       const transcribed = performance.now();
       const db = await getDb();
       // One transaction: the transcript is only kept with the usage it cost.
@@ -207,6 +223,14 @@ async function transcribeWindow(
             sql: `INSERT OR REPLACE INTO analysis_window (url_key, start, url, segments, created_at) VALUES (?, ?, ?, ?, ?)`,
             args: [urlKey, start, url, JSON.stringify(segments), Date.now()],
           },
+          ...(envelope
+            ? [
+                {
+                  sql: `INSERT OR REPLACE INTO analysis_envelope (url_key, start, envelope, created_at) VALUES (?, ?, ?, ?)`,
+                  args: [urlKey, start, envelope, Date.now()],
+                },
+              ]
+            : []),
           usageStatement(userId, { audioSeconds }),
         ],
         "write",
@@ -220,8 +244,9 @@ async function transcribeWindow(
         bytes: audio.length,
         audioSeconds,
         segments: segments.length,
+        envelope: envelope !== null,
       });
-      return { segments, end: false };
+      return { segments, end: false, envelope };
     },
     signal,
   );
@@ -299,17 +324,24 @@ export async function analyzeWindow(
   const detector = detectorKey(config);
   const stored = await storedWindow(urlKey, window, detector);
   if (stored.segments && stored.ads) {
-    return { window, segments: stored.segments, ads: await episodeAds(urlKey, detector), cached: true };
+    return withEnvelope({ window, segments: stored.segments, ads: await episodeAds(urlKey, detector), cached: true }, stored.envelope);
   }
 
   let segments = stored.segments;
+  let envelope = stored.envelope;
   if (!segments) {
     const transcribed = await transcribeWindow(url, urlKey, window, language, userId, signal);
     if (transcribed.end) return { window, segments: [], ads: await episodeAds(urlKey, detector), cached: false, end: true };
     segments = transcribed.segments;
+    envelope = transcribed.envelope;
   }
   await classifyWindow(urlKey, window, segments, episode, config, userId, signal);
-  return { window, segments, ads: await episodeAds(urlKey, detector), cached: false };
+  return withEnvelope({ window, segments, ads: await episodeAds(urlKey, detector), cached: false }, envelope);
+}
+
+/** Adds the window's envelope to a response, when there is one. */
+function withEnvelope(response: AnalyzeResponse, envelope: string | null): AnalyzeResponse {
+  return envelope ? { ...response, envelope } : response;
 }
 
 /** Everything already analyzed for an episode, without doing any new work. */
