@@ -34,10 +34,11 @@ export interface Signal {
   inAd: boolean;
   /** Eases from 0 to 1 over ~1.5 s after a pause, and back on play. */
   rest: number;
-  source: "envelope" | "transcript" | "idle";
+  source: "envelope" | "transcript" | "idle" | "live";
 }
 
-interface Raw {
+/** Loudness at one instant, before smoothing: what a source (envelope, transcript, live audio) provides. */
+export interface Raw {
   level: number;
   low: number;
   high: number;
@@ -50,6 +51,9 @@ interface Raw {
  * −8 dBFS, so that span becomes 0–1; quieter is silence, louder saturates.
  */
 const byteToUnit = (b: number) => Math.min(1, Math.max(0, (b - 100) / 120));
+
+/** dBFS → the same 0–1 scale, for sources measured live (−36 dBFS and below is silence, −8 and up is full). */
+export const unitFromDb = (db: number) => byteToUnit(((db + 60) / 60) * 255);
 
 /** The segment spoken at `time` (segments are sorted by start). */
 function segmentAt(segments: TranscriptSegment[], time: number): TranscriptSegment | undefined {
@@ -119,38 +123,47 @@ export function createSignal() {
   let sinceOnset = Infinity;
   let rest = 1;
 
+  const step = (raw: Raw, playing: boolean, inAd: boolean, dt: number): Signal => {
+    const follow = (value: number, target: number) => ease(value, target, target > value ? ATTACK : RELEASE, dt);
+    level = follow(level, raw.level);
+    low = follow(low, raw.low);
+    high = follow(high, raw.high);
+
+    sinceOnset += dt;
+    onset *= Math.exp(-dt / ONSET_DECAY);
+    // Only while climbing: a loud stretch that stays loud is one onset, not one every ONSET_GAP.
+    const climbing = raw.level > previous + 0.01;
+    if (playing && climbing && raw.level - average > ONSET_RISE && sinceOnset > ONSET_GAP) {
+      onset = 1;
+      sinceOnset = 0;
+    }
+    previous = raw.level;
+    average = ease(average, raw.level, 0.4, dt);
+
+    rest = ease(rest, playing ? 0 : 1, 0.5, dt);
+    // Paused, everything settles to a quarter, never quite still.
+    const damp = 1 - 0.75 * rest;
+    return {
+      level: level * damp,
+      low: low * damp,
+      high: high * damp,
+      onset: onset * damp,
+      speaking: raw.speaking && playing,
+      inAd,
+      rest,
+      source: raw.source,
+    };
+  };
+
   return {
+    /** From the episode: its envelope, else its transcript, else an idle breath. */
     step(input: SignalInput, dt: number): Signal {
-      const raw = rawAt(input);
-      const follow = (value: number, target: number) => ease(value, target, target > value ? ATTACK : RELEASE, dt);
-      level = follow(level, raw.level);
-      low = follow(low, raw.low);
-      high = follow(high, raw.high);
-
-      sinceOnset += dt;
-      onset *= Math.exp(-dt / ONSET_DECAY);
-      // Only while climbing: a loud stretch that stays loud is one onset, not one every ONSET_GAP.
-      const climbing = raw.level > previous + 0.01;
-      if (input.playing && climbing && raw.level - average > ONSET_RISE && sinceOnset > ONSET_GAP) {
-        onset = 1;
-        sinceOnset = 0;
-      }
-      previous = raw.level;
-      average = ease(average, raw.level, 0.4, dt);
-
-      rest = ease(rest, input.playing ? 0 : 1, 0.5, dt);
-      // Paused, everything settles to a quarter, never quite still.
-      const damp = 1 - 0.75 * rest;
-      return {
-        level: level * damp,
-        low: low * damp,
-        high: high * damp,
-        onset: onset * damp,
-        speaking: raw.speaking && input.playing,
-        inAd: input.ads.some((ad) => input.time >= ad.start && input.time < ad.end),
-        rest,
-        source: raw.source,
-      };
+      const inAd = input.ads.some((ad) => input.time >= ad.start && input.time < ad.end);
+      return step(rawAt(input), input.playing, inAd, dt);
+    },
+    /** From values measured some other way (live audio in the field lab). */
+    stepRaw(raw: Raw, playing: boolean, dt: number): Signal {
+      return step(raw, playing, false, dt);
     },
   };
 }
