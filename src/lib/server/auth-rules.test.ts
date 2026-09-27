@@ -14,8 +14,9 @@ vi.stubEnv("DATABASE_URL", `file:${path.join(dir, "test.db")}`);
 vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-test-secret-test-secret-test-secret");
 vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
 vi.stubEnv("PODBLOCK_ADMIN_EMAIL", "Owner@Example.com");
+vi.stubEnv("PODBLOCK_SETUP_CODE", "setup-code-for-tests");
 
-const { getAuth } = await import("@/lib/server/auth");
+const { getAuth, SETUP_CODE_HEADER } = await import("@/lib/server/auth");
 const { getDb } = await import("@/lib/server/db");
 
 afterAll(() => {
@@ -24,7 +25,7 @@ afterAll(() => {
 });
 
 let ip = 0;
-async function call(route: string, body: object, cookie?: string) {
+async function call(route: string, body: object, cookie?: string, extra: Record<string, string> = {}) {
   const auth = await getAuth();
   return auth.handler(
     new Request(`http://localhost:3000/api/auth${route}`, {
@@ -34,14 +35,16 @@ async function call(route: string, body: object, cookie?: string) {
         origin: "http://localhost:3000",
         "x-forwarded-for": `198.51.100.${++ip}`,
         ...(cookie ? { cookie } : {}),
+        ...extra,
       },
       body: JSON.stringify(body),
     }),
   );
 }
 
-const signUp = (email: string, extra: object = {}) =>
-  call("/sign-up/email", { name: email.split("@")[0], email, password: "long enough password", ...extra });
+const signUp = (email: string, extra: object = {}, headers: Record<string, string> = {}) =>
+  call("/sign-up/email", { name: email.split("@")[0], email, password: "long enough password", ...extra }, undefined, headers);
+const withCode = { [SETUP_CODE_HEADER]: "setup-code-for-tests" };
 
 async function signIn(email: string) {
   const res = await call("/sign-in/email", { email, password: "long enough password" });
@@ -63,8 +66,8 @@ describe("account rules", () => {
     expect(await row("early@example.com")).toBeNull();
   });
 
-  it("makes the owner's account (email matched without case) the approved admin", async () => {
-    expect((await signUp("owner@example.com")).status).toBe(200);
+  it("makes the owner's account (email matched without case, with the setup code) the approved admin", async () => {
+    expect((await signUp("owner@example.com", {}, withCode)).status).toBe(200);
     expect(await row("owner@example.com")).toEqual({ role: "admin", approved: 1, banned: 0 });
   });
 
@@ -98,21 +101,21 @@ describe("account rules", () => {
 
   it("promotes an existing account with the owner's email when the server starts", async () => {
     const db = await getDb();
-    await db.execute(`UPDATE "user" SET role = 'user', approved = 0, banned = 1 WHERE email = 'owner@example.com'`);
+    // Demoted and disabled, but an account the admin had approved.
+    await db.execute(`UPDATE "user" SET role = 'user', banned = 1 WHERE email = 'owner@example.com'`);
     (globalThis as { __podblockAuth?: unknown }).__podblockAuth = undefined; // a restart
     await getAuth();
     expect(await row("owner@example.com")).toEqual({ role: "admin", approved: 1, banned: 0 });
   });
 });
 
-describe("admin bootstrap (S-5, pending Q3)", () => {
-  // Current behaviour, pinned so the fix shows up as a deliberate change:
-  // nothing proves the person signing up owns the admin email.
-  it("makes whoever first signs up with the admin email the admin, without verifying it", async () => {
+describe("admin bootstrap (S-5)", () => {
+  // Was: whoever first signed up with the admin email became the admin.
+  it("doesn't let someone without the setup code claim the admin email", async () => {
     const db = await getDb();
     await db.execute(`DELETE FROM "user" WHERE email = 'owner@example.com'`);
     await db.execute(`DELETE FROM "user" WHERE role = 'admin'`);
-    expect((await signUp("owner@example.com")).status).toBe(200);
-    expect(await row("owner@example.com")).toMatchObject({ role: "admin", approved: 1 });
+    expect((await signUp("owner@example.com")).status).toBe(403);
+    expect(await row("owner@example.com")).toBeNull();
   });
 });

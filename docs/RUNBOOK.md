@@ -38,11 +38,12 @@ The server writes one JSON object per line to stdout/stderr (Vercel's log viewer
 
 ## Accounts
 
+- **Creating the admin account:** set `PODBLOCK_ADMIN_EMAIL` and `PODBLOCK_SETUP_CODE` (`openssl rand -hex 12`), open `/signup`, and enter the code; the form asks for it until the admin exists. A refused attempt is logged as `auth.owner_signup_refused`. Signing in with GitHub or Google (verified email) works without the code.
 - **Approving people:** Users in the account menu. A newly approved person gets in straight away ("Check again").
 - **Disabling someone:** Users → Disable. Their sessions are revoked, but a signed session cookie can stay valid for up to **60 seconds** (the session cookie cache), so allow a minute.
 - **Someone forgot their password:** Users → Set password, then tell them the new one privately. There's no email reset (open question Q7).
 - **The admin forgot their password:** there is no in-app recovery yet. Keep it in a password manager. (Tracked with Q7.)
-- **Changing who the admin is:** set `PODBLOCK_ADMIN_EMAIL` to the account's email and restart. On startup that account becomes an approved, un-banned admin. The previous admin keeps the admin role until changed in the database.
+- **Changing who the admin is:** approve that person's account first, then set `PODBLOCK_ADMIN_EMAIL` to its email and restart. On startup it becomes an un-banned admin (only approved or provider-verified accounts are promoted this way). The previous admin keeps the admin role until changed in the database.
 
 ## Keys and settings
 

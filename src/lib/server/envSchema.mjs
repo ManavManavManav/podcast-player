@@ -19,6 +19,7 @@ export const ENV_VARS = [
   { name: "BETTER_AUTH_SECRET", group: "core", secret: true, description: "Signs sessions; at least 32 characters (openssl rand -base64 48). Changing it signs everyone out." },
   { name: "BETTER_AUTH_URL", group: "core", example: "https://podblock.example.com", description: "The site's public address. Sign-in links and origin checks use it; without it they trust the request's Host header." },
   { name: "PODBLOCK_ADMIN_EMAIL", group: "core", example: "you@example.com", description: "The account with this email becomes the admin who approves everyone else. No one can sign up until it exists." },
+  { name: "PODBLOCK_SETUP_CODE", group: "core", secret: true, description: "A one-time code that creating the admin account with email and password takes, so nobody else can claim PODBLOCK_ADMIN_EMAIL first (openssl rand -hex 12). Not needed once the admin exists, or when the admin signs in with GitHub or Google." },
   { name: "TRANSCRIBE_API_KEY", group: "transcription", secret: true, description: "Key for an OpenAI-compatible speech-to-text API that returns segment timestamps (verbose_json)." },
   { name: "TRANSCRIBE_BASE_URL", group: "transcription", example: "https://api.groq.com/openai/v1", description: "Its base URL. Default: Groq." },
   { name: "TRANSCRIBE_MODEL", group: "transcription", example: "whisper-large-v3-turbo", description: "Its model. Default: whisper-large-v3-turbo." },

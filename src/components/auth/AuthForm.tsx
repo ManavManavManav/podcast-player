@@ -14,14 +14,18 @@ export function AuthForm({
   mode,
   next,
   socialProviders,
+  setupCode: askForSetupCode = false,
 }: {
   mode: Mode;
   next: string;
   socialProviders: Array<keyof typeof PROVIDER_LABELS>;
+  /** The admin account doesn't exist yet: creating it takes the server's setup code. */
+  setupCode?: boolean;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [setupCode, setSetupCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const signup = mode === "signup";
@@ -33,7 +37,12 @@ export function AuthForm({
     setError(null);
     setPending(true);
     const { error } = signup
-      ? await authClient.signUp.email({ name: name.trim(), email: email.trim(), password })
+      ? await authClient.signUp.email({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          ...(askForSetupCode ? { fetchOptions: { headers: { "x-podblock-setup-code": setupCode.trim() } } } : {}),
+        })
       : await authClient.signIn.email({ email: email.trim(), password, rememberMe: true });
     if (error) {
       setError(friendlyError(error.code, error.message));
@@ -48,7 +57,11 @@ export function AuthForm({
     <div className="rounded-3xl bg-surface p-6 sm:p-8">
       <h1 className="font-serif text-3xl tracking-[-0.01em]">{signup ? "Create your account" : "Sign in"}</h1>
       <p className="mt-2 text-sm text-muted">
-        {signup ? "New accounts are approved by this server's owner before first use." : "Welcome back."}
+        {signup
+          ? askForSetupCode
+            ? "Create the admin account, with the email and setup code set on the server."
+            : "New accounts are approved by this server's owner before first use."
+          : "Welcome back."}
       </p>
 
       {socialProviders.length > 0 && (
@@ -101,6 +114,19 @@ export function AuthForm({
             className={inputClass}
           />
         </Field>
+
+        {signup && askForSetupCode && (
+          <Field label="Setup code" hint="PODBLOCK_SETUP_CODE on the server">
+            <input
+              required
+              aria-label="Setup code"
+              autoComplete="off"
+              value={setupCode}
+              onChange={(e) => setSetupCode(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+        )}
 
         {error && (
           <p role="alert" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">

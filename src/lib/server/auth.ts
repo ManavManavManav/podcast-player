@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { LibsqlDialect, type LibsqlDialectConfig } from "@libsql/kysely-libsql";
 import type { Client } from "@libsql/client";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
@@ -23,6 +24,37 @@ export const enabledSocialProviders = Object.keys(socialProviders) as Array<"git
 async function adminExists(db: Client): Promise<boolean> {
   const { rows } = await db.execute(`SELECT 1 FROM "user" WHERE role = 'admin' LIMIT 1`);
   return rows.length > 0;
+}
+
+/** Whether the admin account exists yet (until it does, creating it takes the setup code). */
+export async function hasAdmin(): Promise<boolean> {
+  return adminExists(await getDb());
+}
+
+/** Where the sign-up form sends the one-time setup code. */
+export const SETUP_CODE_HEADER = "x-podblock-setup-code";
+
+const digest = (value: string) => createHash("sha256").update(value).digest();
+
+/**
+ * Why the owner's account (PODBLOCK_ADMIN_EMAIL) may not be created this
+ * way, or null if it may. Signing up with an email address proves nothing
+ * about owning it, so that takes the setup code (PODBLOCK_SETUP_CODE); an
+ * address GitHub or Google has verified is proof enough.
+ */
+export function ownerSignUpRefusal(
+  user: { emailVerified?: boolean | null },
+  context: { path?: string; headers?: Headers } | null,
+): string | null {
+  const viaProvider = context?.path?.startsWith("/callback") ?? false;
+  if (viaProvider && user.emailVerified) return null;
+  const expected = process.env.PODBLOCK_SETUP_CODE ?? "";
+  if (!expected) {
+    return "The admin account needs a setup code: set PODBLOCK_SETUP_CODE on the server, then enter it here.";
+  }
+  const given = context?.headers?.get(SETUP_CODE_HEADER) ?? "";
+  // Compared as digests, so the time taken says nothing about the code.
+  return timingSafeEqual(digest(given), digest(expected)) ? null : "That setup code isn't right.";
 }
 
 /**
@@ -69,7 +101,7 @@ export function getAuthOptions(db: Client) {
     databaseHooks: {
       user: {
         create: {
-          before: async (user) => {
+          before: async (user, context) => {
             const owner = adminEmail();
             if (!owner) {
               throw new APIError("FORBIDDEN", {
@@ -77,6 +109,11 @@ export function getAuthOptions(db: Client) {
               });
             }
             if (user.email.toLowerCase() === owner) {
+              const refusal = ownerSignUpRefusal(user, context);
+              if (refusal) {
+                log.warn("auth.owner_signup_refused", { viaProvider: Boolean(context?.path?.startsWith("/callback")) });
+                throw new APIError("FORBIDDEN", { message: refusal });
+              }
               return { data: { ...user, approved: true, role: "admin" } };
             }
             if (!(await adminExists(db))) {
@@ -97,12 +134,18 @@ export function getAuthOptions(db: Client) {
 const createAuth = (options: ReturnType<typeof getAuthOptions>) => betterAuth(options);
 export type Auth = ReturnType<typeof createAuth>;
 
-/** If the admin's account already exists (e.g. the email was set later), make sure it's the admin. */
+/**
+ * If the admin's account already exists (e.g. the email was set later), make
+ * sure it's the admin. Only an account the admin approved or whose email a
+ * provider verified: otherwise whoever signed up with that address first
+ * would be promoted.
+ */
 async function promoteAdmin(db: Client) {
   const owner = adminEmail();
   if (!owner) return;
   await db.execute({
-    sql: `UPDATE "user" SET role = 'admin', approved = 1, banned = 0 WHERE lower(email) = ?`,
+    sql: `UPDATE "user" SET role = 'admin', approved = 1, banned = 0
+          WHERE lower(email) = ? AND (role = 'admin' OR approved = 1 OR "emailVerified" = 1)`,
     args: [owner],
   });
 }

@@ -12,11 +12,11 @@ Please report vulnerabilities privately rather than in a public issue: through G
 - **Browser hardening.** A content security policy (no framing, plugins, `<base>` changes, off-site form posts or API calls), plus `X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, COOP and, in production, HSTS.
 - **Errors.** Clients get a message written for them and a code; ffmpeg output, file paths and provider responses stay in the server log.
 - **Secrets.** API keys live only in the server's environment. The logs redact configured secret values, and the setup checks never print them.
+- **The admin account.** Creating the account with `PODBLOCK_ADMIN_EMAIL` takes a one-time setup code (`PODBLOCK_SETUP_CODE`) or an email address GitHub or Google has verified, so nobody can claim it first. At startup an existing account with that email is made admin only if the admin had approved it or a provider verified it.
 - **Sign-in.** Better Auth: passwords of at least 10 characters, rate-limited sign-in and sign-up (counts stored in the database, so they hold across serverless instances), and a sign-in redirect limited to paths on the site.
 
 ## Known limitations
 
-- **Admin bootstrap:** until the admin account exists, whoever first signs up with `PODBLOCK_ADMIN_EMAIL` becomes the admin; nothing verifies they own that address. Create the admin account right after deploying. (A fix is planned; see `PRODUCTION_PLAN.md`, S-5.)
 - **Session cache:** a disabled account can keep access for up to 60 seconds.
 - **Inline scripts:** the content security policy allows inline scripts (Next.js's hydration scripts are inline), so it limits but doesn't prevent script injection.
 - **Bundled ffmpeg** is a 2018 static build decoding files that users choose. A move to a maintained build is planned (S-7).

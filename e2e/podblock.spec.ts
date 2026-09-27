@@ -10,12 +10,13 @@ test.describe.configure({ mode: "serial" });
 const OWNER = { name: "Owner", email: "owner@example.com", password: "correct horse battery" };
 const FRIEND = { name: "Friend", email: "friend@example.com", password: "friend's password" };
 
-async function signUp(browser: Browser, who: typeof OWNER): Promise<Page> {
+async function signUp(browser: Browser, who: typeof OWNER, setupCode?: string): Promise<Page> {
   const page = await (await browser.newContext()).newPage();
   await page.goto("/signup");
   await page.getByLabel("Name").fill(who.name);
   await page.getByLabel("Email").fill(who.email);
   await page.getByLabel("Password").fill(who.password);
+  if (setupCode) await page.getByLabel("Setup code").fill(setupCode);
   await page.getByRole("button", { name: "Create account" }).click();
   return page;
 }
@@ -30,8 +31,8 @@ async function signIn(page: Page, who: typeof OWNER) {
 
 const playhead = (page: Page) => page.locator("audio").evaluate((audio: HTMLAudioElement) => audio.currentTime);
 
-test("the owner signs up first and approves a friend", async ({ browser }) => {
-  const owner = await signUp(browser, OWNER);
+test("the owner signs up first, with the setup code, and approves a friend", async ({ browser }) => {
+  const owner = await signUp(browser, OWNER, "e2e-setup-code");
   await expect(owner.getByRole("heading", { name: /Podcasts,\s*minus the ads/ })).toBeVisible();
 
   const friend = await signUp(browser, FRIEND);

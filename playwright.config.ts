@@ -18,6 +18,7 @@ const appEnv = {
   BETTER_AUTH_SECRET: "e2e-secret-e2e-secret-e2e-secret-e2e-secret",
   BETTER_AUTH_URL: APP,
   PODBLOCK_ADMIN_EMAIL: "owner@example.com",
+  PODBLOCK_SETUP_CODE: "e2e-setup-code",
   PODBLOCK_TRUSTED_ORIGINS: "",
   PODCAST_INDEX_BASE_URL: `${FAKE}/podcastindex`,
   PODCAST_INDEX_API_KEY: "fake",

@@ -13,6 +13,7 @@ vi.stubEnv("DATABASE_URL", `file:${path.join(dir, "test.db")}`);
 vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-test-secret-test-secret-test-secret");
 vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
 vi.stubEnv("PODBLOCK_ADMIN_EMAIL", "owner@example.com");
+vi.stubEnv("PODBLOCK_SETUP_CODE", "setup-code-for-tests");
 
 const { getAuth } = await import("@/lib/server/auth");
 const { getDb } = await import("@/lib/server/db");
@@ -28,7 +29,7 @@ function post(auth: Auth, route: string, body: object, ip = "203.0.113.7") {
   return auth.handler(
     new Request(`http://localhost:3000/api/auth${route}`, {
       method: "POST",
-      headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": ip },
+      headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-podblock-setup-code": "setup-code-for-tests", "x-forwarded-for": ip },
       body: JSON.stringify(body),
     }),
   );

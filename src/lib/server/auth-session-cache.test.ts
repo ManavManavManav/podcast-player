@@ -9,6 +9,7 @@ vi.stubEnv("DATABASE_URL", `file:${path.join(dir, "test.db")}`);
 vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-test-secret-test-secret-test-secret");
 vi.stubEnv("BETTER_AUTH_URL", "http://localhost:3000");
 vi.stubEnv("PODBLOCK_ADMIN_EMAIL", "owner@example.com");
+vi.stubEnv("PODBLOCK_SETUP_CODE", "setup-code-for-tests");
 
 const { getAuth } = await import("@/lib/server/auth");
 const { getDb } = await import("@/lib/server/db");
@@ -24,7 +25,7 @@ async function signedInCookie() {
     auth.handler(
       new Request(`http://localhost:3000/api/auth${route}`, {
         method: "POST",
-        headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-forwarded-for": `192.0.2.${Math.floor(Math.random() * 250)}` },
+        headers: { "content-type": "application/json", origin: "http://localhost:3000", "x-podblock-setup-code": "setup-code-for-tests", "x-forwarded-for": `192.0.2.${Math.floor(Math.random() * 250)}` },
         body: JSON.stringify(body),
       }),
     );

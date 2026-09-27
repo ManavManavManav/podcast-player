@@ -28,11 +28,12 @@ You need **Node.js 22+** (CI uses 24; see `.nvmrc`) and four sets of keys:
 npm install
 cp .env.example .env.local          # add the keys above and your email as PODBLOCK_ADMIN_EMAIL
 echo "BETTER_AUTH_SECRET=$(openssl rand -base64 48)" >> .env.local
+echo "PODBLOCK_SETUP_CODE=$(openssl rand -hex 12)" >> .env.local
 npm run doctor                      # checks the setup
 npm run dev
 ```
 
-Open <http://localhost:3000>, **create your account first, with the admin email**, then search for a show and press play.
+Open <http://localhost:3000>, **create your account first, with the admin email and the setup code** from `.env.local`, then search for a show and press play.
 
 ## How it works
 
@@ -62,7 +63,7 @@ Transcripts and verdicts are stored per episode in the database and shared by ev
 ## Accounts and approval
 
 - **Sign-in** uses [Better Auth](https://www.better-auth.com) with email and password. GitHub and Google sign-in appear when their OAuth credentials are set.
-- **The admin** is whoever signs up with `PODBLOCK_ADMIN_EMAIL`. Until that account exists, nobody else can sign up, so create yours right after deploying.
+- **The admin** is the account with `PODBLOCK_ADMIN_EMAIL`. Creating it with a password takes the one-time `PODBLOCK_SETUP_CODE` (the sign-up form asks for it), so nobody else can claim the address; signing in with GitHub or Google, which verify the email, works without it. Until the admin exists, nobody else can sign up.
 - **Everyone else** can sign up, but sees "Waiting for approval" until the admin approves them under **Users** in the account menu. Unapproved accounts can't search, play through the analyzer, or cost you anything.
 - **The Users page** also shows each person's usage this month (minutes transcribed, detection calls, tokens), and lets the admin disable, re-enable or delete accounts and set a new password for someone who forgot theirs (there's no email-based reset).
 - **API keys** belong to the server's owner and live only in the environment. Users never see or need them.
@@ -74,7 +75,7 @@ Transcripts and verdicts are stored per episode in the database and shared by ev
 1. **Create a database.** Vercel's filesystem doesn't persist, so accounts and transcripts need a hosted database. [Turso](https://turso.tech) (SQLite-compatible, free tier) works as is: create a database, then note its URL (`libsql://…turso.io`) and an auth token. It's also available from the Vercel Marketplace.
 2. **Import the repo** into Vercel. No build settings need changing.
 3. **Add environment variables** in the project's settings: everything from your `.env.local`, plus `DATABASE_URL` and `DATABASE_AUTH_TOKEN`. Tables are created on first use.
-4. **Deploy**, open the site, and **sign up with your admin email first**.
+4. **Deploy**, open the site, and **sign up with your admin email and the setup code** (`PODBLOCK_SETUP_CODE`) first.
 
 The analyze function is allowed 120 seconds (a window normally takes a few), which fits Vercel's defaults. The Hobby plan is for non-commercial use, which covers friends and family.
 
@@ -88,6 +89,7 @@ See [`.env.example`](.env.example).
 | `BETTER_AUTH_SECRET` | none (required) | Signs sessions; at least 32 characters. `openssl rand -base64 48`. In production the server won't serve requests without a valid one. |
 | `BETTER_AUTH_URL` | the request's host | The site's public address, e.g. `https://podblock.example.com`. Set it in production. |
 | `PODBLOCK_ADMIN_EMAIL` | none (required) | The account that becomes the admin. |
+| `PODBLOCK_SETUP_CODE` | none | A one-time code the sign-up form asks for when creating the admin account with email and password (`openssl rand -hex 12`). Not needed once the admin exists, or when the admin signs in with GitHub or Google. |
 | `TRANSCRIBE_API_KEY` | none (required) | Speech-to-text key. |
 | `TRANSCRIBE_BASE_URL`, `TRANSCRIBE_MODEL` | Groq, `whisper-large-v3-turbo` | Any OpenAI-compatible `/audio/transcriptions` API that returns segment timestamps (`verbose_json`), e.g. DeepInfra: `https://api.deepinfra.com/v1/openai`, `openai/whisper-large-v3-turbo`. |
 | `DETECT_API_KEY` | none (required) | Ad-detection key. |
