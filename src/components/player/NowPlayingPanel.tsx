@@ -96,7 +96,7 @@ function TabButton({
       aria-controls={controls}
       tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors ${
+      className={`touch-target relative flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors ${
         active ? "bg-accent text-accent-text" : "text-text hover:bg-surface"
       }`}
     >

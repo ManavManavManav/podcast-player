@@ -120,6 +120,19 @@ body {
 }
 
 @layer utilities {
+  /* On touch screens, a hit area of at least 44×44 px around small controls, without changing how they look.
+     The control must be positioned (relative or absolute). */
+  @media (pointer: coarse) {
+    .touch-target::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      translate: -50% -50%;
+    }
+  }
   .scrollbar-none {
     scrollbar-width: none;
   }

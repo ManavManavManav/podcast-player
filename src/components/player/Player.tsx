@@ -455,7 +455,7 @@ function SecondaryControls() {
         onClick={() => setAutoSkip(!autoSkip)}
         aria-pressed={autoSkip}
         title={autoSkip ? `Skipping ads · ${stats.adsSkipped} skipped so far` : "Ad skipping is off"}
-        className={`hover-breathe flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium [--hover-scale:1.04] ${
+        className={`hover-breathe touch-target relative flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium [--hover-scale:1.04] ${
           autoSkip ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2"
         }`}
       >
@@ -523,7 +523,7 @@ function SecondaryControls() {
         aria-pressed={panelOpen}
         aria-label="Transcript and ads"
         title="Transcript (T)"
-        className={`hover-breathe grid size-8 place-items-center rounded-full hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
+        className={`hover-breathe touch-target relative grid size-8 place-items-center rounded-full hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
       >
         <ScrollText className="size-4" />
       </button>

@@ -41,7 +41,7 @@ export function Popover({
         aria-label={label}
         aria-expanded={open}
         aria-controls={id}
-        className={`hover-breathe flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium hover:bg-surface-2 [--hover-scale:1.05] ${
+        className={`hover-breathe touch-target relative flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium hover:bg-surface-2 [--hover-scale:1.05] ${
           open ? "bg-surface-2" : ""
         }`}
       >
