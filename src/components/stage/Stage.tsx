@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Garden } from "@/components/garden/Garden";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Waveform } from "@/components/player/Waveform";
@@ -75,6 +76,8 @@ export function Stage({
         if (dy > 90 && Math.abs(dy) > Math.abs(dx) * 2) close();
       }}
     >
+      {/* The garden grows behind everything, with the episode. */}
+      <Garden variant="stage" />
       {/* The show, up the left edge. */}
       <Link
         href={`/podcast/${episode.podcastId}`}

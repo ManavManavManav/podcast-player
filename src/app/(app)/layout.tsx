@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { Garden } from "@/components/garden/Garden";
 import { Logo } from "@/components/Logo";
 import { NavLinks } from "@/components/NavLinks";
 import { SearchBox } from "@/components/SearchBox";
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main id="main" className="mx-auto max-w-6xl px-4 pb-[calc(var(--player-space,0px)+3rem)] pt-6 sm:px-6">
         {children}
       </main>
+      <Garden />
       <Player userId={user.id} />
     </>
   );
