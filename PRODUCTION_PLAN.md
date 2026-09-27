@@ -13,6 +13,13 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 - **Three Vercel projects** deploy from this repo (`podcast-player`, `podcast-player-pn69`, `podcast-player-xoj3`); probably two are leftovers worth deleting.
 - **Before merging to `vercel-api`:** add `CRON_SECRET` in Vercel and give Preview its own `DATABASE_URL` (RUNBOOK → Preview deployments). `PODBLOCK_SETUP_CODE` is only needed for a fresh database. The first production request after the deploy migrates the schema (tested on a copy of your data).
 
+## Deployed (2026-09-27)
+
+- `main` (Vercel's production branch) and `vercel-api` fast-forwarded to this work (`3d0520c`); the `podcast-player` production deployment built successfully. Its URLs are behind Vercel's deployment protection, so the live check has to be done by you: open the site, and `/api/healthz` should answer `{"ok":true}`. A 500 there means the startup configuration check refused the settings; the reason is the `config.invalid` line in Vercel's logs.
+- The leftover projects `podcast-player-pn69` and `podcast-player-xoj3` answer 500 everywhere, apparently for lack of settings. Their `/login` also failed while I briefly rolled `main` back, so it's not the new code. You only need `podcast-player`: delete the other two in Vercel (Project → Settings → Delete). A force-push of `main` back to `5be255f` didn't redeploy (Vercel doesn't rebuild a commit it has already built), and `main` is back at the shipped commit.
+- `main` stays, because it's what Vercel deploys to production. To get down to one branch, set the `podcast-player` project's production branch to `vercel-api`; then `main` can go.
+- Dependabot opened its first pull requests (major upgrades: ESLint 10, TypeScript 7, @types/node 26). CI checks each one; they need individual review.
+
 ## Decisions (answered 2026-09-26)
 
 | Q | Answer | Consequence |
