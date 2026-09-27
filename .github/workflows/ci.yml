@@ -1,8 +1,8 @@
 name: CI
 
 on:
+  # Every branch, so work is checked before it's merged.
   push:
-    branches: [main, vercel-api]
   pull_request:
 
 concurrency:

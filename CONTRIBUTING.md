@@ -44,4 +44,4 @@ Client code is tested in a DOM (`// @vitest-environment happy-dom` at the top of
 
 ## CI
 
-`.github/workflows/ci.yml` runs on pushes to `main` and `vercel-api` and on pull requests. It runs typecheck, lint, tests with coverage, the build and a dependency audit on Node 22 and 24, plus the end-to-end tests. Dependabot proposes dependency updates weekly.
+`.github/workflows/ci.yml` runs on every push and pull request. It runs typecheck, lint, tests with coverage, the build and a dependency audit on Node 22 and 24, plus the end-to-end tests. Dependabot proposes dependency updates weekly.
