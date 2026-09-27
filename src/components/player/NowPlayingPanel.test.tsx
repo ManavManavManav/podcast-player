@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Profiler } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
@@ -55,5 +55,42 @@ describe("NowPlayingPanel", () => {
     for (let t = 100; t < 105; t += 0.25) act(() => usePlayback.setState({ currentTime: t }));
     expect(commits).toBeLessThanOrEqual(3);
     console.log(`transcript panel: ${commits} commits, ${renderMs.toFixed(0)} ms rendering over 20 ticks`);
+  });
+
+  it("switches tabs with the arrow keys and links each tab to its panel", () => {
+    act(() => useAnalysis.setState({ segments: [{ start: 0, end: 5, text: "hello" }], ads: [] }));
+    render(<NowPlayingPanel />);
+    const transcript = screen.getByRole("tab", { name: "Transcript" });
+    const ads = screen.getByRole("tab", { name: /Ad breaks/ });
+    expect(transcript.getAttribute("aria-selected")).toBe("true");
+    expect(transcript.tabIndex).toBe(0);
+    expect(ads.tabIndex).toBe(-1);
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(transcript.id);
+
+    fireEvent.keyDown(transcript, { key: "ArrowRight" });
+    expect(ads.getAttribute("aria-selected")).toBe("true");
+    expect(document.activeElement).toBe(ads);
+    expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(ads.id);
+    fireEvent.keyDown(ads, { key: "ArrowRight" });
+    expect(transcript.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("marks the current line, even inside an ad", () => {
+    act(() => {
+      useAnalysis.setState({
+        segments: [
+          { start: 0, end: 10, text: "before" },
+          { start: 10, end: 20, text: "sponsor read" },
+        ],
+        ads: [{ start: 10, end: 20, confidence: 1, reason: "Ad: Acme" }],
+      });
+      usePlayback.setState({ currentTime: 12 });
+    });
+    render(<NowPlayingPanel />);
+    const line = screen.getByText("sponsor read").closest("button")!;
+    expect(line.getAttribute("aria-current")).toBe("true");
+    expect(line.className).toMatch(/bg-ad-soft/);
+    expect(line.className).toMatch(/before:bg-text/);
+    expect(screen.getByText("before").closest("button")!.hasAttribute("aria-current")).toBe(false);
   });
 });

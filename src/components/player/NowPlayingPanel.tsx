@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, RefreshCw, X } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { retryScanning } from "@/hooks/useAdScanner";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { formatClock, formatDuration } from "@/lib/text";
@@ -10,48 +10,94 @@ import { adAt, useAnalysis } from "@/store/analysis";
 import { usePlayback, usePlayer } from "@/store/player";
 
 type Tab = "transcript" | "ads";
+const TABS: Tab[] = ["transcript", "ads"];
+
+/** The tab last chosen, kept for the rest of the visit so reopening the panel doesn't reset it. */
+let lastTab: Tab = "transcript";
 
 export function NowPlayingPanel() {
-  const [tab, setTab] = useState<Tab>("transcript");
+  const [tab, setTabState] = useState<Tab>(lastTab);
+  const setTab = (next: Tab) => {
+    lastTab = next;
+    setTabState(next);
+  };
   const setPanelOpen = usePlayer((s) => s.setPanelOpen);
   const ads = useAnalysis((s) => s.ads);
+  const id = useId();
+  const tabId = (t: Tab) => `${id}-tab-${t}`;
+  const panelId = `${id}-panel`;
+
+  // Arrow keys move between tabs, as in any tab list.
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length];
+    setTab(next);
+    document.getElementById(tabId(next))?.focus();
+  };
 
   return (
     <section
       aria-label="Transcript and ads"
       className="animate-toast-in mx-auto mb-2 flex max-h-[min(62dvh,36rem)] w-full max-w-[69rem] flex-col overflow-hidden rounded-3xl bg-surface shadow-float"
     >
-      <div className="flex items-center gap-2 px-4 pb-2 pt-4 sm:px-5">
-        <div role="tablist" className="flex gap-2">
-          <TabButton active={tab === "transcript"} onClick={() => setTab("transcript")}>
+      {/* Phones: tabs and close on one row, scan status under them. Wider: all on one row. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 pb-2 pt-4 sm:flex-nowrap sm:px-5">
+        <div role="tablist" aria-label="Panel" onKeyDown={onTabKey} className="flex shrink-0 gap-1 rounded-full bg-surface-2 p-1">
+          <TabButton id={tabId("transcript")} controls={panelId} active={tab === "transcript"} onClick={() => setTab("transcript")}>
             Transcript
           </TabButton>
-          <TabButton active={tab === "ads"} onClick={() => setTab("ads")}>
-            Ad breaks{ads.length > 0 && <span className="ml-1.5 font-mono text-xs opacity-70">{ads.length}</span>}
+          <TabButton id={tabId("ads")} controls={panelId} active={tab === "ads"} onClick={() => setTab("ads")}>
+            <span aria-hidden="true" className="sm:hidden">
+              Ads
+            </span>
+            <span className="max-sm:sr-only">Ad breaks</span>
+            {ads.length > 0 && <span className="ml-1.5 font-mono text-xs opacity-70">{ads.length}</span>}
           </TabButton>
         </div>
-        <ScanStatus />
+        <div className="order-last min-w-0 basis-full sm:order-none sm:ml-auto sm:basis-auto">
+          <ScanStatus />
+        </div>
         <button
           onClick={() => setPanelOpen(false)}
-          className="hover-breathe rounded-full p-1.5 text-muted hover:bg-surface-2 hover:text-text"
+          className="hover-breathe ml-auto grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-text sm:ml-0"
           aria-label="Close panel"
         >
           <X className="size-4" />
         </button>
       </div>
-      {tab === "transcript" ? <Transcript /> : <AdList />}
+      <div id={panelId} role="tabpanel" aria-labelledby={tabId(tab)} className="flex min-h-0 flex-1 flex-col">
+        {tab === "transcript" ? <Transcript /> : <AdList />}
+      </div>
     </section>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  id,
+  controls,
+  active,
+  onClick,
+  children,
+}: {
+  id: string;
+  controls: string;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
+      id={id}
       role="tab"
       aria-selected={active}
+      aria-controls={controls}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`hover-breathe flex h-9 items-center rounded-full px-4 text-sm font-medium [--hover-scale:1.04] ${
-        active ? "bg-accent text-accent-text" : "bg-surface-2 text-text"
+      className={`flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors ${
+        active ? "bg-accent text-accent-text" : "text-text hover:bg-surface"
       }`}
     >
       {children}
@@ -67,7 +113,7 @@ function ScanStatus() {
 
   if (error) {
     return (
-      <div className="ml-auto flex min-w-0 items-center gap-2 text-xs text-danger">
+      <div className="flex min-w-0 items-center gap-2 text-xs text-danger">
         <span className="truncate" title={error}>
           Ad detection paused: {error}
         </span>
@@ -79,7 +125,7 @@ function ScanStatus() {
   }
 
   return (
-    <p className="ml-auto flex items-center gap-1.5 truncate font-mono text-xs text-faint">
+    <p className="flex items-center gap-1.5 truncate font-mono text-xs text-faint sm:justify-end">
       {scanning && <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />}
       {scanning ? "Listening ahead…" : done ? `${(done * WINDOW_SECONDS) / 60} min analyzed` : ""}
     </p>
@@ -180,9 +226,13 @@ const TranscriptLine = memo(function TranscriptLine({
   return (
     <button
       data-index={index}
+      aria-current={active || undefined}
       onClick={() => onSeek(segment.start)}
-      className={`hover-fill flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-body leading-relaxed ${
-        ad ? "bg-ad-soft text-muted" : active ? "bg-surface-2 font-medium text-text" : past ? "text-muted" : "text-text"
+      className={`hover-fill hover-soft relative flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-body leading-relaxed ${
+        ad ? "bg-ad-soft" : active ? "bg-surface-2" : ""
+      } ${active ? "font-medium text-text" : ad || past ? "text-muted" : "text-text"} ${
+        // The current line always carries an ink bar, even inside an ad, so you can see where you are.
+        active ? "before:absolute before:inset-y-2 before:left-1 before:w-[3px] before:rounded-full before:bg-text" : ""
       }`}
     >
       <span className={`w-14 shrink-0 pt-0.5 font-mono text-xs ${ad ? "text-ad-text" : active ? "text-text" : "text-faint"}`}>
