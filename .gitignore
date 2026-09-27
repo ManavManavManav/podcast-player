@@ -49,3 +49,7 @@ next-env.d.ts
 /.e2e-data/
 /test-results/
 /playwright-report/
+
+# UI screenshots (scripts/ux-shots.mjs)
+/.ux-shots/
+/.ux-shots-data/
