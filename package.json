@@ -42,7 +42,7 @@
     "happy-dom": "^20.14.5",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   },
   "description": "A podcast player that transcribes ahead of you and skips the ads.",
