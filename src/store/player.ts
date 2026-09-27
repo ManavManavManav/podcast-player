@@ -5,6 +5,11 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { Episode } from "@/lib/types";
 
 export const PLAYBACK_RATES = [0.8, 1, 1.2, 1.5, 1.75, 2] as const;
+/** How far the back and forward buttons, keys and media keys jump. */
+export const BACK_SECONDS = 15;
+export const FORWARD_SECONDS = 30;
+/** A fine step, for Shift+arrow on the seek bar. */
+export const FINE_SECONDS = 5;
 
 // --- Live playback state -------------------------------------------------------
 // Changes several times a second, so it lives in its own store that is never

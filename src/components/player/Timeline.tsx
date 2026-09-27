@@ -5,6 +5,7 @@ import { WINDOW_SECONDS } from "@/lib/analysis";
 import { formatClock } from "@/lib/text";
 import type { AdRange } from "@/lib/types";
 import type { WindowStatus } from "@/store/analysis";
+import { BACK_SECONDS, FINE_SECONDS, FORWARD_SECONDS } from "@/store/player";
 
 interface Props {
   currentTime: number;
@@ -32,14 +33,17 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * duration;
   };
 
+  // The same jumps as the player's buttons and global shortcuts; Shift for a fine step.
   const onKeyDown = (e: React.KeyboardEvent) => {
+    const back = e.shiftKey ? -FINE_SECONDS : -BACK_SECONDS;
+    const forward = e.shiftKey ? FINE_SECONDS : FORWARD_SECONDS;
     const steps: Record<string, number> = {
-      ArrowLeft: -5,
-      ArrowRight: 5,
-      ArrowDown: -5,
-      ArrowUp: 5,
-      PageDown: -30,
-      PageUp: 30,
+      ArrowLeft: back,
+      ArrowDown: back,
+      ArrowRight: forward,
+      ArrowUp: forward,
+      PageDown: -60,
+      PageUp: 60,
     };
     if (e.key in steps) onSeek(currentTime + steps[e.key]);
     else if (e.key === "Home") onSeek(0);

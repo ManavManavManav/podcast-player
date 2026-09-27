@@ -29,10 +29,8 @@ import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
 import { formatClock } from "@/lib/text";
 import type { AdRange } from "@/lib/types";
 import { adAt, useAnalysis } from "@/store/analysis";
-import { PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
+import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
 
-const BACK_SECONDS = 15;
-const FORWARD_SECONDS = 30;
 const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
 /** Don't bother skipping the last sliver of an ad. */
 const MIN_REMAINING = 1.5;
