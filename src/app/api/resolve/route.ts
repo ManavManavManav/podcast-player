@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!isHttpUrl(body.url) || !(await isPublicUrl(body.url))) {
     return NextResponse.json({ error: "`url` must be a public http(s) URL" }, { status: 400 });
   }
-  const resolved = await resolveAudioUrl(body.url);
+  const resolved = await resolveAudioUrl(body.url, { fresh: body.fresh === true });
   // A redirect could point somewhere internal; only hand back public URLs.
   return NextResponse.json({ url: (await isPublicUrl(resolved)) ? resolved : body.url });
 }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "@/lib/server/errors";
 import { parseTranscription, transcribe } from "@/lib/server/transcribe";
 
 const config = { baseUrl: "https://stt.example/v1", apiKey: "sk-test", model: "whisper-large-v3-turbo" };
@@ -69,5 +70,27 @@ describe("transcribe", () => {
   it("refuses responses without timestamps", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ text: "just text" })));
     await expect(transcribe(Buffer.from("x"), 0, 300, undefined, config)).rejects.toThrow(/timestamps/);
+  });
+
+  it("marks its failures as transcription errors", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "down" }, { status: 503 })));
+    const err = await transcribe(Buffer.from("x"), 0, 300, undefined, config).catch((e) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.kind).toBe("transcription");
+  });
+
+  it("retries once when the provider is rate-limiting or briefly down, but not on auth errors", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 429, headers: { "retry-after": "0" } }))
+      .mockResolvedValueOnce(Response.json({ duration: 300, segments: [{ start: 1, end: 2, text: "Hi" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await transcribe(Buffer.from("x"), 0, 300, undefined, config)).segments).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const unauthorized = vi.fn(async () => Response.json({ error: { message: "Invalid API Key" } }, { status: 401 }));
+    vi.stubGlobal("fetch", unauthorized);
+    await expect(transcribe(Buffer.from("x"), 0, 300, undefined, config)).rejects.toThrow(/401/);
+    expect(unauthorized).toHaveBeenCalledTimes(1);
   });
 });

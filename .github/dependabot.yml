@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Grouped, so routine bumps arrive as one weekly pull request that CI checks.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # The Playwright version must match the browser build CI installs; bump it deliberately.
+      - dependency-name: "@playwright/test"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

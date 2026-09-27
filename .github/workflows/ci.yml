@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  # Every branch, so work is checked before it's merged.
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      # Report each Node version on its own rather than cancelling the other.
+      fail-fast: false
+      matrix:
+        # The oldest Node the app supports (package.json engines) and the one it runs on (.nvmrc).
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test:coverage
+      - uses: actions/upload-artifact@v7
+        if: always() && matrix.node == '24'
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 14
+      - run: npm run build
+      # Known-vulnerable runtime dependencies fail the build; dev-only advisories don't.
+      - run: npm audit --omit=dev --audit-level=high
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      # Against scripts/fake-providers.mjs: no keys or network needed.
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
