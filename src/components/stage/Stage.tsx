@@ -183,7 +183,7 @@ function SpokenLines() {
             </p>
           )}
           <p key={current.start} className="max-w-5xl text-balance text-[clamp(28px,5vw,64px)] leading-[1.02] tracking-[-0.01em]">
-            <span className="wipe [--wipe-ms:700ms]">{current.text}</span>
+            <span className="wipe text-balance [--wipe-ms:700ms]">{current.text}</span>
           </p>
           {inAd && <p className="mt-4 text-base uppercase text-ad sm:text-xl">Ad</p>}
         </>
@@ -244,10 +244,8 @@ function TitleBar() {
           className="relative cursor-pointer touch-none select-none text-[clamp(20px,2.6vw,34px)] uppercase leading-none"
         >
           {/* The unplayed part: ink text on the ground. */}
-          <span className="block truncate px-2 pb-1 pt-1.5">
-            <span key={episode.id} className="wipe">
-              {episode.title}
-            </span>
+          <span key={episode.id} className="wipe block truncate px-2 pb-1 pt-1.5">
+            {episode.title}
           </span>
           {/* The played part: the same text, reversed out of an ink fill. */}
           <span

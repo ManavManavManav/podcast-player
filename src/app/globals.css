@@ -246,17 +246,25 @@ body {
   }
 }
 
-.wipe {
-  position: relative;
-  animation: wipe-text var(--wipe-ms, 900ms) steps(1, end) both;
-}
-.wipe::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--wipe, currentColor);
-  pointer-events: none;
-  animation: wipe-block var(--wipe-ms, 900ms) cubic-bezier(0.65, 0, 0.35, 1) both;
+/* A box, not inline text: on wrapped or cut-off text an inline element's block
+   would only cover part of it, and letters would show before the reveal. In the
+   components layer so utilities (block, truncate…) can still change it. */
+@layer components {
+  .wipe {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    vertical-align: top;
+    animation: wipe-text var(--wipe-ms, 900ms) steps(1, end) both;
+  }
+  .wipe::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--wipe, currentColor);
+    pointer-events: none;
+    animation: wipe-block var(--wipe-ms, 900ms) cubic-bezier(0.65, 0, 0.35, 1) both;
+  }
 }
 
 /* ---------------------------------------------------------------------------

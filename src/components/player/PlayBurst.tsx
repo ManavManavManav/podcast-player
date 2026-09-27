@@ -86,8 +86,9 @@ interface Stick {
 function barRect(): DOMRect {
   const bar = document.querySelector("[data-player-bar]");
   if (bar) return bar.getBoundingClientRect();
-  const w = Math.min(window.innerWidth - (window.innerWidth >= 640 ? 32 : 16), 1104);
-  const h = window.innerWidth >= 768 ? 92 : 132;
+  // The player box, collapsed: 36rem wide at most, a waveform over one row of controls.
+  const w = Math.min(window.innerWidth - (window.innerWidth >= 640 ? 32 : 16), 576);
+  const h = 98;
   return new DOMRect((window.innerWidth - w) / 2, window.innerHeight - h - (window.innerWidth >= 640 ? 16 : 8), w, h);
 }
 

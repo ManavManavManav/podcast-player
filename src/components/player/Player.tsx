@@ -1,28 +1,12 @@
 "use client";
 
-import {
-  LoaderCircle,
-  Maximize2,
-  Moon,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-  ScrollText,
-  ShieldCheck,
-  ShieldOff,
-  Volume1,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Artwork } from "@/components/Artwork";
-import { MenuItem, Popover } from "@/components/player/Popover";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { BAR_FADE_MS, BAR_REVEAL_MS, barShouldMaterialize } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
-import { Timeline } from "@/components/player/Timeline";
+import { Waveform } from "@/components/player/Waveform";
 import { Stage } from "@/components/stage/Stage";
 import { IconButton } from "@/components/ui/IconButton";
 import { useAdScanner } from "@/hooks/useAdScanner";
@@ -32,7 +16,6 @@ import type { AdRange } from "@/lib/types";
 import { adAt, useAnalysis } from "@/store/analysis";
 import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
 
-const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
 /** Don't bother skipping the last sliver of an ad. */
 const MIN_REMAINING = 1.5;
 /** Longest we'll wait at the end of an ad break to learn whether it continues. */
@@ -401,85 +384,100 @@ function playUpNext() {
 
 // --- Bar --------------------------------------------------------------------------------
 
+/** Word buttons, as on the Stage: uppercase, struck through on hover, an ink block when on. */
+const word =
+  "touch-target relative inline-flex h-7 items-center px-1.5 uppercase leading-none whitespace-nowrap hover:line-through focus-visible:line-through aria-pressed:bg-text aria-pressed:text-bg aria-pressed:no-underline";
+
+/**
+ * The player: a box floating over the page with the episode's waveform along
+ * its top. Compact, it holds play, the title and the time; on hover (or MORE,
+ * on phones) it widens and opens a row of controls as words.
+ */
 function PlayerBar() {
   const episode = usePlayer((s) => s.episode)!;
   const { playing, buffering, holding, currentTime, duration } = usePlayback();
-  const { toggle, skipBy, seek, stop, setStageOpen } = usePlayer();
+  const { toggle, seek, stop, setStageOpen, panelOpen } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
   const segments = useAnalysis((s) => s.segments);
+  const envelopes = useAnalysis((s) => s.envelopes);
   // Started from a play button's burst: stay hidden until the sticks land here.
   const [materialize] = useState(barShouldMaterialize);
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const leave = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const open = hovered || pinned || panelOpen;
 
   return (
     <div
       data-player-bar
+      onPointerEnter={(e) => {
+        if (e.pointerType !== "mouse") return;
+        if (leave.current) clearTimeout(leave.current);
+        setHovered(true);
+      }}
+      onPointerLeave={(e) => {
+        if (e.pointerType !== "mouse") return;
+        // A moment's grace, so brushing past the edge doesn't snap it shut.
+        leave.current = setTimeout(() => setHovered(false), 350);
+      }}
       style={materialize ? { animationDelay: `${BAR_REVEAL_MS - 50}ms`, animationDuration: `${BAR_FADE_MS}ms` } : undefined}
-      className={`mx-auto w-full max-w-[69rem] rounded-3xl bg-surface/80 px-3 pb-2 pt-3 shadow-float backdrop-blur-2xl backdrop-saturate-150 sm:px-5 ${
-        materialize ? "animate-bar-materialize" : ""
-      }`}
+      className={`mx-auto w-full border border-text bg-bg font-grotesk shadow-float transition-[max-width] duration-300 ease-soft ${
+        open ? "max-w-[60rem]" : "max-w-[36rem]"
+      } ${materialize ? "animate-bar-materialize" : ""}`}
     >
-      <div className="flex items-center gap-3">
-        <button onClick={() => setStageOpen(true)} className="group shrink-0" aria-label="Open Now Playing">
-          <Artwork src={episode.image} alt="" priority className="size-12 rounded-xl transition-transform group-hover:scale-105" />
+      <div className="px-3 pt-2.5">
+        <Waveform
+          currentTime={currentTime}
+          duration={duration}
+          ads={ads}
+          windows={windows}
+          envelopes={envelopes}
+          segments={segments}
+          onSeek={seek}
+        />
+      </div>
+
+      <div className="flex items-center gap-3 px-3 pb-2.5 pt-2">
+        <button
+          onClick={toggle}
+          aria-label={playing ? "Pause" : "Play"}
+          className="grid h-9 min-w-[4.75rem] shrink-0 place-items-center bg-text px-3 text-sm uppercase text-bg hover:line-through"
+        >
+          {/* Loading (buffering before the first play), buffering mid-play, or holding at an ad break. */}
+          {buffering || holding ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : playing ? "Pause" : "Play"}
+        </button>
+        <button onClick={() => setStageOpen(true)} className="shrink-0" aria-label="Open Now Playing">
+          <Artwork src={episode.image} alt="" priority className="size-9" />
         </button>
         <div className="min-w-0 flex-1">
-          <button onClick={() => setStageOpen(true)} className="block max-w-full truncate text-left font-serif text-lg leading-tight hover:underline" title="Open Now Playing (F)">
+          <button
+            onClick={() => setStageOpen(true)}
+            className="block max-w-full truncate text-left text-sm font-medium leading-tight hover:line-through"
+            title="Open Now Playing (F)"
+          >
             {episode.title}
           </button>
           <StatusLine podcastTitle={episode.podcastTitle} />
         </div>
-
-        <div className="flex items-center gap-0.5 sm:gap-1.5">
-          <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="max-sm:hidden">
-            <RotateCcw className="size-[18px]" />
-            <span className="absolute text-[8px] font-bold">{BACK_SECONDS}</span>
-          </IconButton>
-          <button
-            onClick={toggle}
-            aria-label={playing ? "Pause" : "Play"}
-            className="hover-breathe grid size-12 place-items-center rounded-full bg-accent text-accent-text [--hover-scale:1.08]"
-          >
-            {/* Loading (buffering before the first play), buffering mid-play, or holding at an ad break. */}
-            {buffering || holding ? (
-              <LoaderCircle className="size-5 animate-spin" />
-            ) : playing ? (
-              <Pause className="size-5 fill-current" />
-            ) : (
-              <Play className="ml-0.5 size-5 fill-current" />
-            )}
-          </button>
-          <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="max-sm:hidden">
-            <RotateCw className="size-[18px]" />
-            <span className="absolute text-[8px] font-bold">{FORWARD_SECONDS}</span>
-          </IconButton>
-        </div>
-
-        <div className="hidden flex-1 items-center justify-end gap-1 md:flex">
-          <SecondaryControls />
-        </div>
-        <IconButton label="Open Now Playing (F)" onClick={() => setStageOpen(true)} className="max-md:hidden">
-          <Maximize2 className="size-4" />
-        </IconButton>
-        <IconButton label="Close player" onClick={stop}>
+        <span className="shrink-0 font-mono text-micro tabular-nums text-muted max-sm:hidden">
+          {formatClock(currentTime)} / {duration > 0 ? formatClock(duration) : "--:--"}
+        </span>
+        <button className={`${word} shrink-0 text-xs`} aria-expanded={open} onClick={() => setPinned(!pinned)}>
+          {open ? "Less" : "More"}
+        </button>
+        <IconButton label="Close player" onClick={stop} size="sm" className="rounded-none">
           <X className="size-4" />
         </IconButton>
       </div>
 
-      <div className="mt-1.5">
-        <Timeline currentTime={currentTime} duration={duration} ads={ads} windows={windows} segments={segments} onSeek={seek} />
-      </div>
-
-      <div className="flex items-center justify-between md:hidden">
-        <IconButton label={`Back ${BACK_SECONDS} seconds`} onClick={() => skipBy(-BACK_SECONDS)} className="sm:hidden">
-          <RotateCcw className="size-[18px]" />
-          <span className="absolute text-[8px] font-bold">{BACK_SECONDS}</span>
-        </IconButton>
-        <SecondaryControls />
-        <IconButton label={`Forward ${FORWARD_SECONDS} seconds`} onClick={() => skipBy(FORWARD_SECONDS)} className="sm:hidden">
-          <RotateCw className="size-[18px]" />
-          <span className="absolute text-[8px] font-bold">{FORWARD_SECONDS}</span>
-        </IconButton>
+      {/* The rest of the controls, as words. Grows open on hover or MORE. */}
+      <div className={`grid transition-[grid-template-rows] duration-300 ease-soft ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+        <div className="min-h-0 overflow-hidden" inert={!open}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-text/15 px-2 py-2 text-xs">
+            <Controls />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -581,89 +579,58 @@ function Countdown({ until }: { until: number }) {
   return <span className="font-mono tabular-nums">{Math.max(0, Math.ceil((until - now) / 1000))}</span>;
 }
 
-function SecondaryControls() {
-  const { autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen, stats } = usePlayer();
+/** The expanded row: skipping, ads, speed, sleep, transcript, Now Playing and volume. */
+function Controls() {
+  const { skipBy, autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen, setStageOpen } = usePlayer();
   const adCount = useAnalysis((s) => s.ads.length);
+  const nextRate = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]) + 1) % PLAYBACK_RATES.length];
+  const sleepSteps = [15, 30, 60];
 
   return (
     <>
+      <button className={word} onClick={() => skipBy(-BACK_SECONDS)} aria-label={`Back ${BACK_SECONDS} seconds`}>
+        −{BACK_SECONDS}
+      </button>
+      <button className={word} onClick={() => skipBy(FORWARD_SECONDS)} aria-label={`Forward ${FORWARD_SECONDS} seconds`}>
+        +{FORWARD_SECONDS}
+      </button>
+      <span aria-hidden="true" className="text-faint">
+        |
+      </span>
       <button
+        className={word}
         onClick={() => setAutoSkip(!autoSkip)}
         aria-pressed={autoSkip}
-        title={autoSkip ? `Skipping ads · ${stats.adsSkipped} skipped so far` : "Ad skipping is off"}
-        className={`hover-breathe touch-target relative flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-xs font-medium [--hover-scale:1.04] ${
-          autoSkip ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2"
-        }`}
+        title={autoSkip ? "Skipping ads (S)" : "Ad skipping is off (S)"}
       >
-        {autoSkip ? <ShieldCheck className="size-4 text-ad" /> : <ShieldOff className="size-4" />}
-        <span>{autoSkip ? "Skipping ads" : "Ads on"}</span>
-        {adCount > 0 && <span className="font-mono text-micro text-muted">{adCount}</span>}
+        {autoSkip ? "Skipping ads" : "Ads on"}
+        {adCount > 0 && <span className="ml-1.5 font-mono opacity-70">{adCount}</span>}
       </button>
-
-      <Popover label="Playback speed" trigger={<span className="font-mono">{rate}×</span>}>
-        {(close) =>
-          PLAYBACK_RATES.map((r) => (
-            <MenuItem
-              key={r}
-              selected={r === rate}
-              onSelect={() => {
-                setRate(r);
-                close();
-              }}
-            >
-              {r}×
-            </MenuItem>
-          ))
-        }
-      </Popover>
-
-      <Popover
-        label="Sleep timer"
-        trigger={
-          <>
-            <Moon className={`size-4 ${sleepAt ? "fill-current text-accent" : ""}`} />
-            {sleepAt && <SleepCountdown until={sleepAt} />}
-          </>
-        }
-      >
-        {(close) => (
-          <>
-            <p className="px-3 pb-1 pt-1.5 text-xs text-faint">Pause after</p>
-            {SLEEP_OPTIONS.map((m) => (
-              <MenuItem
-                key={m}
-                onSelect={() => {
-                  setSleep(m);
-                  close();
-                }}
-              >
-                {m} minutes
-              </MenuItem>
-            ))}
-            {sleepAt && (
-              <MenuItem
-                onSelect={() => {
-                  setSleep(null);
-                  close();
-                }}
-              >
-                Turn off
-              </MenuItem>
-            )}
-          </>
-        )}
-      </Popover>
-
+      <button className={word} onClick={() => setRate(nextRate)} aria-label={`Speed ${rate}×, change to ${nextRate}×`}>
+        <span className="font-mono normal-case">{rate}×</span>
+      </button>
       <button
-        onClick={() => setPanelOpen(!panelOpen)}
-        aria-pressed={panelOpen}
-        aria-label="Transcript and ads"
-        title="Transcript (T)"
-        className={`hover-breathe touch-target relative grid size-8 place-items-center rounded-full hover:bg-surface-2 ${panelOpen ? "bg-surface-2 text-accent" : ""}`}
+        className={word}
+        aria-pressed={sleepAt !== null}
+        onClick={() => {
+          // Off → 15 → 30 → 60 minutes → off.
+          const left = sleepAt ? Math.round((sleepAt - Date.now()) / 60_000) : 0;
+          const next = sleepSteps.find((m) => m > left);
+          setSleep(sleepAt && !next ? null : (next ?? sleepSteps[0]));
+        }}
+        title="Sleep timer: 15, 30 or 60 minutes"
       >
-        <ScrollText className="size-4" />
+        Sleep{sleepAt && <SleepCountdown until={sleepAt} />}
       </button>
-
+      <span aria-hidden="true" className="text-faint">
+        |
+      </span>
+      <button className={word} onClick={() => setPanelOpen(!panelOpen)} aria-pressed={panelOpen} title="Transcript (T)">
+        Transcript
+      </button>
+      <button className={word} onClick={() => setStageOpen(true)} title="Now Playing (F)">
+        Now Playing
+      </button>
       <VolumeControl />
     </>
   );
@@ -675,28 +642,40 @@ function SleepCountdown({ until }: { until: number }) {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  return <span className="font-mono text-accent">{formatClock((until - now) / 1000)}</span>;
+  return <span className="ml-1.5 font-mono normal-case">{formatClock((until - now) / 1000)}</span>;
 }
 
+/** The word VOLUME, filled with ink to the level. Click or drag to set; double-click mutes. */
 function VolumeControl() {
   const { volume, muted, setVolume, toggleMute } = usePlayer();
-  const Icon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const level = muted ? 0 : volume;
+  const set = (el: HTMLElement, clientX: number) => {
+    const rect = el.getBoundingClientRect();
+    setVolume(Math.round(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * 20) / 20);
+  };
   return (
-    <div className="hidden items-center gap-1 lg:flex">
-      <IconButton label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
-        <Icon className="size-4" />
-      </IconButton>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={muted ? 0 : volume}
-        onChange={(e) => setVolume(Number(e.target.value))}
-        aria-label="Volume"
-        className="h-1 w-20 cursor-pointer accent-[var(--accent)]"
-      />
-    </div>
+    <button
+      className="relative ml-auto hidden h-7 touch-none px-1.5 uppercase leading-none lg:block"
+      aria-label={`Volume ${Math.round(level * 100)}%`}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        set(e.currentTarget, e.clientX);
+      }}
+      onPointerMove={(e) => e.buttons === 1 && set(e.currentTarget, e.clientX)}
+      onDoubleClick={toggleMute}
+      onKeyDown={(e) => {
+        const step = e.key === "ArrowRight" || e.key === "ArrowUp" ? 0.1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -0.1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setVolume(Math.min(1, Math.max(0, Math.round((level + step) * 10) / 10)));
+      }}
+    >
+      <span className="block">Volume</span>
+      <span aria-hidden="true" className="absolute inset-0 grid place-items-center bg-text px-1.5 text-bg" style={{ clipPath: `inset(0 ${(1 - level) * 100}% 0 0)` }}>
+        Volume
+      </span>
+    </button>
   );
 }
 

@@ -66,14 +66,9 @@ async function walk(name, contextOptions, signUp) {
     await shot("seek-preview", { wait: 400 });
     await page.mouse.move(0, 0);
   }
-  // The Stage, once per drawing, cycling with its style word.
+  // Now Playing (the Stage).
   await page.keyboard.press("f");
-  for (let i = 0; i < 4; i++) {
-    const style = page.getByRole("button", { name: /^Drawing: / });
-    const kind = (await style.getAttribute("aria-label")).match(/Drawing: (\w+)/)[1];
-    await shot(`stage-${kind}`, { wait: 3500 });
-    await style.click();
-  }
+  await shot("stage", { wait: 2500 });
   await page.keyboard.press("Escape");
   await page.keyboard.press("t");
   await shot("transcript", { wait: 2500 });
