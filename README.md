@@ -74,7 +74,7 @@ Transcripts and verdicts are stored per episode in the database and shared by ev
 
 1. **Create a database.** Vercel's filesystem doesn't persist, so accounts and transcripts need a hosted database. [Turso](https://turso.tech) (SQLite-compatible, free tier) works as is: create a database, then note its URL (`libsql://…turso.io`) and an auth token. It's also available from the Vercel Marketplace.
 2. **Import the repo** into Vercel. No build settings need changing.
-3. **Add environment variables** in the project's settings: everything from your `.env.local`, plus `DATABASE_URL` and `DATABASE_AUTH_TOKEN`. Tables are created on first use.
+3. **Add environment variables** in the project's settings: everything from your `.env.local`, plus `DATABASE_URL`, `DATABASE_AUTH_TOKEN` and `CRON_SECRET`. Tables are created on first use; `vercel.json` schedules a daily cleanup of analysis older than 30 days.
 4. **Deploy**, open the site, and **sign up with your admin email and the setup code** (`PODBLOCK_SETUP_CODE`) first.
 
 The analyze function is allowed 120 seconds (a window normally takes a few), which fits Vercel's defaults. The Hobby plan is for non-commercial use, which covers friends and family.
@@ -96,6 +96,7 @@ See [`.env.example`](.env.example).
 | `DETECT_BASE_URL`, `DETECT_MODEL` | Xiaomi MiMo, `mimo-v2.6-pro` | Any OpenAI-compatible `/chat/completions` API. `mimo-v2.6-flash` is cheaper. Changing the model re-runs detection for episodes listened to afterwards. |
 | `DATABASE_URL`, `DATABASE_AUTH_TOKEN` | local file `.data/podblock.db` | A libSQL/Turso database. Required on Vercel. |
 | `PODBLOCK_DATA_DIR` | `.data` | Where the local database file lives when `DATABASE_URL` isn't set. |
+| `CRON_SECRET` | not set | On Vercel, authorizes the daily cleanup (`vercel.json`): transcripts and verdicts older than 30 days, expired sessions. `openssl rand -hex 24`. |
 | `PODBLOCK_TRUSTED_ORIGINS` | not set | Extra addresses the site is reached at, comma-separated, so sign-in works from them. |
 | `PODBLOCK_LOG_LEVEL` | `info` | Server log level (`debug`, `info`, `warn`, `error`, `silent`). Logs are one JSON object per line. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | not set | Optional social sign-in; both halves of a pair are needed. |

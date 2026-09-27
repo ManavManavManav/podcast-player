@@ -29,6 +29,7 @@ export const ENV_VARS = [
   { name: "DATABASE_URL", group: "database", example: "libsql://<db>.turso.io", description: "A libSQL/Turso database. Unset: a local SQLite file in PODBLOCK_DATA_DIR. Required on Vercel." },
   { name: "DATABASE_AUTH_TOKEN", group: "database", secret: true, description: "Auth token for DATABASE_URL." },
   { name: "PODBLOCK_DATA_DIR", group: "database", example: ".data", description: "Where the local database file lives when DATABASE_URL is unset. Default: .data" },
+  { name: "CRON_SECRET", group: "core", secret: true, description: "Authorizes Vercel Cron's daily cleanup (analysis older than 30 days, expired sessions). Vercel sends it automatically once set (openssl rand -hex 24)." },
   { name: "PODBLOCK_TRUSTED_ORIGINS", group: "optional", example: "https://podblock.example.com", description: "Other addresses the site is reached at, comma-separated, so sign-in and the app's own requests work from them." },
   { name: "PODBLOCK_LOG_LEVEL", group: "optional", example: "info", description: "Minimum server log level: debug, info, warn, error or silent. Default: info." },
   { name: "GITHUB_CLIENT_ID", group: "optional", description: "GitHub OAuth app for “Continue with GitHub” (callback: <site>/api/auth/callback/github)." },
@@ -119,6 +120,9 @@ export function checkEnv(env, { production, vercel }) {
     if (has(`${provider}_CLIENT_ID`) !== has(`${provider}_CLIENT_SECRET`)) {
       warnings.push(`${provider}_CLIENT_ID and ${provider}_CLIENT_SECRET must both be set for that sign-in button to appear.`);
     }
+  }
+  if (vercel && !has("CRON_SECRET")) {
+    warnings.push("CRON_SECRET isn't set, so the daily cleanup (analysis older than 30 days, expired sessions) won't run.");
   }
   if (production && has("PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS")) {
     warnings.push("PODBLOCK_UNSAFE_ALLOW_AUDIO_HOSTS is set: those hosts bypass the private-network check. It's for end-to-end tests only.");

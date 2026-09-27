@@ -12,7 +12,7 @@ describe("proxy", () => {
     for (const url of ["/", "/search?q=a", "/podcast/1", "/admin", "/settings", "/pending", "/api/analyze", "/api/health"]) {
       expect(runsFor(url), url).toBe(true);
     }
-    for (const url of ["/login", "/signup", "/api/auth/sign-in/email", "/_next/static/chunks/a.js", "/icon.svg", "/api/healthz", "/api/readyz"]) {
+    for (const url of ["/login", "/signup", "/api/auth/sign-in/email", "/_next/static/chunks/a.js", "/icon.svg", "/api/healthz", "/api/readyz", "/api/cron/cleanup"]) {
       expect(runsFor(url), url).toBe(false);
     }
   });

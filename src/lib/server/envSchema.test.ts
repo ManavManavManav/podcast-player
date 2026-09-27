@@ -87,6 +87,13 @@ describe("checkEnv", () => {
     }
   });
 
+  it("warns on Vercel when the daily cleanup can't run", () => {
+    const vercel = { production: true, vercel: true };
+    const withDb = { ...good, DATABASE_URL: "libsql://db.turso.io", DATABASE_AUTH_TOKEN: "t" };
+    expect(checkEnv(withDb, vercel).warnings.join("\n")).toMatch(/CRON_SECRET/);
+    expect(checkEnv({ ...withDb, CRON_SECRET: "x".repeat(24) }, vercel).warnings).toEqual([]);
+  });
+
   it("accepts the base64 form of the Podcast Index secret", () => {
     expect(checkEnv({ ...good, PODCAST_INDEX_API_SECRET: undefined, PODCAST_INDEX_API_SECRET_BASE64: "c2VjcmV0" }, production).warnings).toEqual([]);
   });

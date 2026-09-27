@@ -28,6 +28,7 @@ The server writes one JSON object per line to stdout/stderr (Vercel's log viewer
 | `admin.action` | An admin approved, disabled, re-enabled or deleted an account, or set a password (`adminId`, `action`, `targetEmail`, `ok`). Passwords are never logged. |
 | `auth` | Better Auth's own messages. |
 | `schema.migrated` | The database schema was brought up to date. |
+| `retention.cleanup` | The daily cleanup ran: how many transcripts, verdicts, sessions, verifications and rate-limit rows it removed. `retention.not_configured` means `CRON_SECRET` isn't set. |
 | `config.warning` / `config.invalid` | See above. |
 
 ## Deploying
@@ -53,6 +54,10 @@ The server writes one JSON object per line to stdout/stderr (Vercel's log viewer
 | `BETTER_AUTH_SECRET` | **Signs everyone out.** Rotate it if it may have leaked. |
 | `DETECT_MODEL` (or the detection prompt's `PROMPT_VERSION`) | Stored verdicts are keyed by model and prompt version, so every episode listened to afterwards is **re-detected and billed again** (transcripts are reused). |
 | `TRANSCRIBE_MODEL` | Stored transcripts are kept and reused; only new windows use the new model. |
+
+## Housekeeping
+
+Transcripts and verdicts are kept for **30 days** (`RETENTION_DAYS` in `src/lib/server/retention.ts`); after that, listening again pays for the analysis again. Vercel Cron calls `/api/cron/cleanup` daily at 04:30 UTC (`vercel.json`) with `CRON_SECRET`; it also removes verdicts whose transcript is gone, expired sessions and verifications, and old rate-limit counters. Check the Cron Jobs tab in Vercel, or the `retention.cleanup` log line. To run it by hand: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your site>/api/cron/cleanup`.
 
 ## Re-analysing an episode
 

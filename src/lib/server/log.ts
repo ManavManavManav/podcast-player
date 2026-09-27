@@ -19,6 +19,7 @@ const LEVELS: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40
 const SECRET_SETTINGS = [
   "BETTER_AUTH_SECRET",
   "PODBLOCK_SETUP_CODE",
+  "CRON_SECRET",
   "TRANSCRIBE_API_KEY",
   "DETECT_API_KEY",
   "PODCAST_INDEX_API_KEY",
