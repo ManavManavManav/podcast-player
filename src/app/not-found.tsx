@@ -1,13 +1,22 @@
 import Link from "next/link";
+import { BackButton } from "@/components/BackButton";
+import { StatusPage } from "@/components/StatusPage";
 import { buttonStyles } from "@/components/ui/Button";
 
 export default function NotFound() {
   return (
-    <div className="py-24 text-center">
-      <h1 className="text-2xl font-semibold">Page not found</h1>
-      <Link href="/" className={`mt-6 ${buttonStyles()}`}>
-        Back home
-      </Link>
-    </div>
+    <StatusPage
+      title="Page not found"
+      actions={
+        <>
+          <BackButton />
+          <Link href="/" className={buttonStyles()}>
+            Home
+          </Link>
+        </>
+      }
+    >
+      There&apos;s nothing at this address. It may have moved, or the link may be mistyped.
+    </StatusPage>
   );
 }
