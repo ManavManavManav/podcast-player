@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountSettings } from "@/components/settings/AccountSettings";
+import { BackgroundSettings } from "@/components/settings/BackgroundSettings";
 import { currentUser } from "@/lib/server/session";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -13,6 +14,7 @@ export default async function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-12">
       <h1 className="font-serif text-5xl tracking-display">Settings</h1>
       <AccountSettings name={user.name} email={user.email} />
+      <BackgroundSettings />
     </div>
   );
 }

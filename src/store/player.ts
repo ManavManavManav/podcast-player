@@ -89,6 +89,10 @@ interface PlayerState {
    * fetching the feed again.
    */
   following: Record<string, Neighbours>;
+  /** Where the audio-reactive background shows. "auto": everywhere on desktop, only on the Stage on phones. */
+  field: FieldMode;
+  /** How strongly it draws, 0–1. */
+  fieldIntensity: number;
 
   /** Plays `episode`; `list` is the show's episode list it was chosen from, if any. */
   play: (episode: Episode, list?: Episode[]) => void;
@@ -107,8 +111,19 @@ interface PlayerState {
   savePosition: () => void;
   resumePoint: (episode: Episode) => number;
   setAutoNext: (on: boolean) => void;
+  setField: (mode: FieldMode) => void;
+  setFieldIntensity: (intensity: number) => void;
   /** The episode to play after `episode` ends, or null. */
   nextAfter: (episode: Episode) => Episode | null;
+}
+
+export type FieldMode = "auto" | "off" | "stage" | "everywhere";
+
+/** What "auto" means on this device: the full field on desktop, only on the Stage on phones (battery). */
+export function resolveFieldMode(mode: FieldMode): Exclude<FieldMode, "auto"> {
+  if (mode !== "auto") return mode;
+  if (typeof window === "undefined") return "stage";
+  return window.matchMedia("(pointer: fine)").matches && window.innerWidth >= 768 ? "everywhere" : "stage";
 }
 
 interface Neighbours {
@@ -149,6 +164,8 @@ export const usePlayer = create<PlayerState>()(
       stats: { adsSkipped: 0, secondsSaved: 0 },
       autoNext: true,
       following: {},
+      field: "auto",
+      fieldIntensity: 0.6,
 
       play: (episode, list) => {
         const { audio } = usePlayback.getState();
@@ -221,6 +238,8 @@ export const usePlayer = create<PlayerState>()(
       },
 
       setAutoNext: (autoNext) => set({ autoNext }),
+      setField: (field) => set({ field }),
+      setFieldIntensity: (fieldIntensity) => set({ fieldIntensity: Math.min(1, Math.max(0, fieldIntensity)) }),
 
       nextAfter: (episode) => {
         const { following, recent, positions } = get();
@@ -265,6 +284,8 @@ export const usePlayer = create<PlayerState>()(
         stats: s.stats,
         autoNext: s.autoNext,
         following: s.following,
+        field: s.field,
+        fieldIntensity: s.fieldIntensity,
       }),
     },
   ),

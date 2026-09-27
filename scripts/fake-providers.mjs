@@ -3,7 +3,7 @@
 // offline development: the Podcast Index API, an OpenAI-compatible
 // transcription and chat API, and a podcast host serving one episode.
 //
-// The episode is 10 minutes of tone. Every 5-minute window "transcribes" to
+// The episode is 10 minutes of speech-like tone. Every 5-minute window "transcribes" to
 // the same lines, with a sponsor read 20–50 s in, which the fake detector
 // reports; so the known ads are at 0:20–0:50 and 5:20–5:50.
 //
@@ -35,8 +35,13 @@ const AD_LINES = [
 const ffmpeg = process.env.FFMPEG_PATH || require("ffmpeg-static");
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "podblock-fake-"));
 const episodeFile = path.join(dir, "episode.mp3");
+// Speech-like rather than a steady tone, so the loudness envelope (and the
+// background drawn from it) has something to follow: syllable-rate pulses,
+// a pause every few seconds, and a voice-like pitch that drifts.
+const SPEECHLIKE =
+  "(0.12+0.88*abs(sin(2*PI*2.7*t)))*lt(mod(t,7),5.4)*0.6*sin(2*PI*(170+50*sin(2*PI*0.23*t))*t)";
 execFileSync(ffmpeg, [
-  "-v", "error", "-f", "lavfi", "-i", `sine=frequency=440:duration=${EPISODE_SECONDS}`,
+  "-v", "error", "-f", "lavfi", "-i", `aevalsrc='${SPEECHLIKE}':s=22050:d=${EPISODE_SECONDS}`,
   "-ac", "1", "-ar", "22050", "-c:a", "libmp3lame", "-b:a", "32k", episodeFile,
 ]);
 const episodeAudio = fs.readFileSync(episodeFile);
