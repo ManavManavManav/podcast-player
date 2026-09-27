@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Waveform } from "@/components/player/Waveform";
+import { windowStartFor } from "@/lib/analysis";
 import { formatClock } from "@/lib/text";
+import { currentLine } from "@/lib/transcript";
 import type { TranscriptSegment } from "@/lib/types";
 import { useAnalysis } from "@/store/analysis";
 import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
@@ -83,7 +85,7 @@ export function Stage({
       </Link>
 
       <TopWords close={close} closeButton={closeButton} />
-      <SpokenLines />
+      <SpokenStream />
       <StageWaveform />
 
       <div className="absolute inset-x-0 bottom-0 z-0 flex flex-col gap-3 p-2 pl-9 sm:flex-row sm:items-end sm:justify-between sm:p-3 sm:pl-12">
@@ -108,7 +110,7 @@ export function Stage({
 
 const word = "uppercase leading-none hover:line-through focus-visible:line-through";
 
-/** Settings along the top: ad skipping, speed, sleep, the drawing, transcript, close. */
+/** Settings along the top: ad skipping, speed, sleep, transcript, close. */
 function TopWords({ close, closeButton }: { close: () => void; closeButton: React.RefObject<HTMLButtonElement | null> }) {
   const { autoSkip, setAutoSkip, rate, setRate, sleepAt, setSleep, panelOpen, setPanelOpen } = usePlayer();
   const nextRate = PLAYBACK_RATES[(PLAYBACK_RATES.indexOf(rate as (typeof PLAYBACK_RATES)[number]) + 1) % PLAYBACK_RATES.length];
@@ -174,129 +176,102 @@ function StageWaveform() {
   );
 }
 
-/** Index of the last line starting at or before `time`, or -1. */
-function lineAt(segments: TranscriptSegment[], time: number): number {
-  let low = 0;
-  let high = segments.length - 1;
-  let found = -1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (segments[mid].start <= time) {
-      found = mid;
-      low = mid + 1;
-    } else high = mid - 1;
-  }
-  return found;
-}
+/** How many lines the stream keeps above the one being said. */
+const STREAM_BEHIND = 3;
 
-/** What's being said, large, with the line before it fading above. */
-function SpokenLines() {
+/**
+ * What's being said, as a stream: the current line large at the foot, its
+ * words darkening as they're spoken, and the lines before it rising and
+ * fading above. After a jump to a part not transcribed yet it clears,
+ * rather than keep showing lines from before the jump.
+ */
+function SpokenStream() {
   const segments = useAnalysis((s) => s.segments);
-  const index = usePlayback((s) => lineAt(segments, s.currentTime));
-  const inAd = useAnalysis((s) => {
-    const line = segments[index];
-    return line ? s.ads.some((ad) => line.start < ad.end && ad.start < line.end) : false;
-  });
+  const windows = useAnalysis((s) => s.windows);
+  const ads = useAnalysis((s) => s.ads);
+  const index = usePlayback((s) => currentLine(segments, s.currentTime, (w) => windows[w] === "done"));
+  const scanning = usePlayback((s) => windows[windowStartFor(s.currentTime)] === "pending");
   const current = segments[index];
-  const previous = segments[index - 1];
+  const earlier = index > 0 ? segments.slice(Math.max(0, index - STREAM_BEHIND), index) : [];
+  const inAd = current ? ads.some((ad) => current.start < ad.end && ad.start < current.end) : false;
 
   return (
-    <div className="absolute inset-x-0 top-[40%] z-0 -translate-y-1/2 px-10 sm:px-24" aria-live="off">
+    // Anchored at its foot, so each new line pushes the ones before it up.
+    <div className="absolute inset-x-0 bottom-[42%] z-0 px-10 sm:px-24" aria-live="off">
       {current ? (
-        <>
-          {previous && (
-            <p key={`p${previous.start}`} className="mb-4 line-clamp-2 max-w-5xl text-lg leading-tight text-muted sm:text-2xl">
-              {previous.text}
-            </p>
-          )}
-          <p key={current.start} className="max-w-5xl text-balance text-[clamp(28px,5vw,64px)] leading-[1.02] tracking-[-0.01em]">
-            <span className="wipe text-balance [--wipe-ms:700ms]">{current.text}</span>
+        <div className="flex max-w-5xl flex-col gap-3">
+          {/* Remounted with each new line, so the lines above rise together. */}
+          <div key={`before-${current.start}`} className="animate-stream-up flex flex-col gap-3">
+            {earlier.map((line, i) => (
+              <p
+                key={line.start}
+                className="line-clamp-2 text-lg leading-tight text-muted sm:text-2xl"
+                style={{ opacity: (i + 1) / (earlier.length + 1) }}
+              >
+                {line.text}
+              </p>
+            ))}
+          </div>
+          <p key={`now-${current.start}`} className="animate-stream-in text-balance text-[clamp(28px,5vw,64px)] leading-[1.02] tracking-[-0.01em]">
+            <SpokenWords line={current} />
           </p>
-          {inAd && <p className="mt-4 text-base uppercase text-ad sm:text-xl">Ad</p>}
-        </>
+          {inAd && <p className="text-base uppercase text-ad sm:text-xl">Ad</p>}
+        </div>
       ) : (
-        <p className="text-[clamp(22px,3vw,40px)] uppercase leading-none text-muted">Listening ahead…</p>
+        <p className="animate-stream-in text-[clamp(22px,3vw,40px)] uppercase leading-none text-muted">
+          {scanning ? "Transcribing this part…" : "Listening ahead…"}
+        </p>
       )}
     </div>
   );
 }
 
-/** The title in an ink bar that fills as the episode plays; click or drag to seek. */
+/** A line's words, darkening one by one as they're said (spread evenly over the line's time). */
+function SpokenWords({ line }: { line: TranscriptSegment }) {
+  const words = line.text.split(/\s+/).filter(Boolean);
+  const said = usePlayback((s) => {
+    const span = Math.max(0.1, line.end - line.start);
+    return Math.min(words.length, Math.ceil(((s.currentTime - line.start) / span) * words.length));
+  });
+  return (
+    <>
+      {words.map((w, i) => (
+        <span key={i} className={`transition-colors duration-300 ${i < said ? "text-text" : "text-text/30"}`}>
+          {w}{" "}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The title in an ink bar that fills as the episode plays. It only shows
+ * progress; the waveform is the seek bar.
+ */
 function TitleBar() {
   const episode = usePlayer((s) => s.episode)!;
-  const seek = usePlayer((s) => s.seek);
   const currentTime = usePlayback((s) => s.currentTime);
   const duration = usePlayback((s) => s.duration);
-  const ads = useAnalysis((s) => s.ads);
-  const bar = useRef<HTMLDivElement>(null);
-  const [drag, setDrag] = useState<number | null>(null);
-  const shown = drag ?? currentTime;
-  const fraction = duration > 0 ? Math.min(1, Math.max(0, shown / duration)) : 0;
-  const timeAt = (clientX: number) => {
-    const rect = bar.current!.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * duration;
-  };
+  const fraction = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
   return (
     <div className="flex min-w-0 items-end gap-3">
-      <div className="min-w-0 max-w-[min(62vw,44rem)] flex-1 sm:flex-none">
-        <div
-          ref={bar}
-          role="slider"
-          tabIndex={0}
-          aria-label="Seek"
-          aria-valuemin={0}
-          aria-valuemax={Math.round(duration)}
-          aria-valuenow={Math.round(shown)}
-          aria-valuetext={`${formatClock(shown)} of ${formatClock(duration)}`}
-          onKeyDown={(e) => {
-            const step = e.key === "ArrowLeft" ? -BACK_SECONDS : e.key === "ArrowRight" ? FORWARD_SECONDS : 0;
-            if (!step) return;
-            e.preventDefault();
-            e.stopPropagation();
-            seek(currentTime + step);
-          }}
-          onPointerDown={(e) => {
-            if (!duration) return;
-            e.currentTarget.setPointerCapture(e.pointerId);
-            setDrag(timeAt(e.clientX));
-          }}
-          onPointerMove={(e) => drag !== null && setDrag(timeAt(e.clientX))}
-          onPointerUp={(e) => {
-            if (drag === null) return;
-            seek(timeAt(e.clientX));
-            setDrag(null);
-          }}
-          onPointerCancel={() => setDrag(null)}
-          className="relative cursor-pointer touch-none select-none text-[clamp(20px,2.6vw,34px)] uppercase leading-none"
+      <div className="relative min-w-0 max-w-[min(62vw,44rem)] flex-1 select-none text-[clamp(20px,2.6vw,34px)] uppercase leading-none sm:flex-none">
+        {/* The unplayed part: ink text on the ground. */}
+        <span key={episode.id} className="wipe block truncate px-2 pb-1 pt-1.5">
+          {episode.title}
+        </span>
+        {/* The played part: the same text, reversed out of an ink fill. */}
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 block truncate bg-text px-2 pb-1 pt-1.5 text-bg"
+          style={{ clipPath: `inset(0 ${(1 - fraction) * 100}% 0 0)` }}
         >
-          {/* The unplayed part: ink text on the ground. */}
-          <span key={episode.id} className="wipe block truncate px-2 pb-1 pt-1.5">
-            {episode.title}
-          </span>
-          {/* The played part: the same text, reversed out of an ink fill. */}
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 block truncate bg-text px-2 pb-1 pt-1.5 text-bg"
-            style={{ clipPath: `inset(0 ${(1 - fraction) * 100}% 0 0)` }}
-          >
-            {episode.title}
-          </span>
-        </div>
-        {/* Ads as notches under the bar. */}
-        <div className="relative mt-1 h-1.5" aria-hidden="true">
-          {duration > 0 &&
-            ads.map((ad) => (
-              <span
-                key={`${ad.start}-${ad.end}`}
-                className={`absolute inset-y-0 bg-ad ${ad.end <= shown ? "opacity-40" : ""}`}
-                style={{ left: `${(ad.start / duration) * 100}%`, width: `${((ad.end - ad.start) / duration) * 100}%`, minWidth: 3 }}
-              />
-            ))}
-        </div>
+          {episode.title}
+        </span>
       </div>
-      <span className="shrink-0 pb-3 font-mono text-sm tabular-nums sm:text-base">
-        {duration > 0 ? `-${formatClock(Math.max(0, duration - shown))}` : "--:--"}
+      <span className="shrink-0 pb-1 font-mono text-sm tabular-nums sm:text-base">
+        {duration > 0 ? `-${formatClock(Math.max(0, duration - currentTime))}` : "--:--"}
       </span>
     </div>
   );

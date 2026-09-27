@@ -5,6 +5,7 @@ import { memo, useEffect, useId, useRef, useState } from "react";
 import { buttonStyles } from "@/components/ui/Button";
 import { retryScanning } from "@/hooks/useAdScanner";
 import { advertiser } from "@/lib/ads/label";
+import { currentLine, lastStartedBy } from "@/lib/transcript";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { formatClock, formatDuration } from "@/lib/text";
 import type { AdRange, TranscriptSegment } from "@/lib/types";
@@ -132,26 +133,15 @@ function ScanStatus() {
   );
 }
 
-/** Index of the last line starting at or before `time` (lines are sorted), or -1. */
-function lineAt(segments: TranscriptSegment[], time: number): number {
-  let low = 0;
-  let high = segments.length - 1;
-  let found = -1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (segments[mid].start <= time) {
-      found = mid;
-      low = mid + 1;
-    } else high = mid - 1;
-  }
-  return found;
-}
-
 function Transcript() {
   const segments = useAnalysis((s) => s.segments);
   const ads = useAnalysis((s) => s.ads);
   // The current line, not the time: playback ticks ~4×/s, lines change every few seconds.
-  const activeIndex = usePlayback((s) => lineAt(segments, s.currentTime));
+  const windows = useAnalysis((s) => s.windows);
+  // The line being said, if any: none after a jump to a part not transcribed yet, rather than a stale one.
+  const activeIndex = usePlayback((s) => currentLine(segments, s.currentTime, (w) => windows[w] === "done"));
+  // Lines already played, for dimming.
+  const reached = usePlayback((s) => lastStartedBy(segments, s.currentTime));
   const seek = usePlayer((s) => s.seek);
   const container = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
@@ -189,7 +179,7 @@ function Transcript() {
             index={i}
             segment={segment}
             active={i === activeIndex}
-            past={i < activeIndex}
+            past={i < reached && i !== activeIndex}
             ad={adAt(ads, (segment.start + segment.end) / 2)}
             onSeek={seek}
           />
