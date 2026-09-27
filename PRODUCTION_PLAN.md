@@ -6,10 +6,9 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 
 ## Status (2026-09-26, branch `production-hardening`)
 
-- **Done: 43 work items** (including #7, #40, #45b and the new #46 after your answers), each its own commit with tests written first. The suite went from 30 tests (8.8% of lines covered) to **345 passing** unit/integration tests plus 3 Playwright end-to-end journeys.
-- **Won't do (your decisions):** #13 quotas, #33 error tracking, #42 self-host packaging.
-- **Still open:** #11 ffmpeg build (Q8) and #12 episode context (Q9), asked again in plainer terms; #43 is settings in your Vercel/Turso accounts (documented); #44 is done except deleting `main` (needs the default-branch and Vercel production-branch settings changed).
-- **Not pushed yet**, so CI, Dependabot and the Node 22/24 matrix have only been checked locally (same commands, plus a fresh clone).
+- **Done: 44 work items** (including #7, #11, #40, #45b and the new #46 after your answers), each its own commit with tests written first. The suite went from 30 tests (8.8% of lines covered) to **346 passing** unit/integration tests plus 3 Playwright end-to-end journeys.
+- **Won't do (your decisions):** #12 episode-context hardening, #13 quotas, #33 error tracking, #42 self-host packaging.
+- **Left:** #43 is settings in your Vercel/Turso accounts (documented in the RUNBOOK); #44 is done except deleting `main`, which waits until you've pointed Vercel's production branch at `vercel-api`.
 - **Before deploying:** add `PODBLOCK_SETUP_CODE` (only needed for a fresh database) and `CRON_SECRET` in Vercel, and give Preview its own `DATABASE_URL` (RUNBOOK).
 
 ## Decisions (answered 2026-09-26)
