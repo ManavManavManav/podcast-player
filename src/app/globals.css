@@ -213,25 +213,6 @@ body {
   animation: stage-in 420ms cubic-bezier(0.65, 0, 0.35, 1) both;
 }
 
-/* The player bar appearing where the play burst's sticks land (PlayBurst.tsx, BAR_REVEAL_MS). */
-@keyframes bar-materialize {
-  from {
-    opacity: 0;
-    filter: blur(6px);
-    transform: scale(0.985);
-  }
-  to {
-    opacity: 1;
-    filter: none;
-    transform: none;
-  }
-}
-
-.animate-bar-materialize {
-  /* Delay and duration are set inline from PlayBurst's timing. */
-  animation: bar-materialize 350ms cubic-bezier(0.33, 1, 0.68, 1) both;
-}
-
 /* ---------------------------------------------------------------------------
    Block wipe: a solid block sweeps across and leaves the text behind it.
    The text appears at the midpoint, while the block covers it. Used on the

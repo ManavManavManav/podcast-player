@@ -4,7 +4,6 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Artwork } from "@/components/Artwork";
 import { buttonStyles } from "@/components/ui/Button";
-import { playBurst } from "@/components/player/PlayBurst";
 import { formatDuration } from "@/lib/text";
 import type { Episode } from "@/lib/types";
 import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
@@ -79,11 +78,7 @@ function RecentCard({ episode }: { episode: Episode }) {
         )}
       </div>
       <button
-        onClick={(e) => {
-          if (isCurrent) return toggle();
-          playBurst(e.currentTarget);
-          play(episode);
-        }}
+        onClick={() => (isCurrent ? toggle() : play(episode))}
         aria-label={`${playing ? "Pause" : "Play"} ${episode.title}`}
         className={`${buttonStyles({ size: "md" })} w-[6rem]`}
       >

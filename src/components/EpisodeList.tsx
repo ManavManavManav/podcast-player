@@ -1,8 +1,6 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useRef } from "react";
-import { playBurst } from "@/components/player/PlayBurst";
 import { formatDate, formatDuration } from "@/lib/text";
 import type { Episode } from "@/lib/types";
 import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
@@ -26,11 +24,9 @@ function EpisodeRow({ episode, list }: { episode: Episode; list: Episode[] }) {
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
 
-  const playButton = useRef<HTMLButtonElement>(null);
 
   const onClick = () => {
     if (isCurrent) return toggle();
-    playBurst(playButton.current);
     play(episode, list);
   };
   const remaining = episode.duration ? episode.duration * (1 - progress) : 0;
@@ -48,7 +44,6 @@ function EpisodeRow({ episode, list }: { episode: Episode; list: Episode[] }) {
     // button's hover scale isn't clipped by the row, which clips its sheen.
     <li className="group relative -mx-2 flex gap-4 overflow-hidden px-2 py-5">
       <button
-        ref={playButton}
         onClick={onClick}
         aria-label={`${playing ? "Pause" : "Play"} ${episode.title}`}
         className={`press relative z-[2] mt-0.5 grid h-9 w-[5.5rem] shrink-0 place-items-center text-xs uppercase hover:line-through ${

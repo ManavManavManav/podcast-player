@@ -4,7 +4,6 @@ import { LoaderCircle, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Artwork } from "@/components/Artwork";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
-import { BAR_FADE_MS, BAR_REVEAL_MS, barShouldMaterialize } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Waveform } from "@/components/player/Waveform";
 import { Stage } from "@/components/stage/Stage";
@@ -401,8 +400,6 @@ function PlayerBar() {
   const windows = useAnalysis((s) => s.windows);
   const segments = useAnalysis((s) => s.segments);
   const envelopes = useAnalysis((s) => s.envelopes);
-  // Started from a play button's burst: stay hidden until the sticks land here.
-  const [materialize] = useState(barShouldMaterialize);
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const leave = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -421,10 +418,9 @@ function PlayerBar() {
         // A moment's grace, so brushing past the edge doesn't snap it shut.
         leave.current = setTimeout(() => setHovered(false), 350);
       }}
-      style={materialize ? { animationDelay: `${BAR_REVEAL_MS - 50}ms`, animationDuration: `${BAR_FADE_MS}ms` } : undefined}
       className={`mx-auto w-full border border-text bg-bg font-grotesk shadow-float transition-[max-width] duration-300 ease-soft ${
         open ? "max-w-[60rem]" : "max-w-[36rem]"
-      } ${materialize ? "animate-bar-materialize" : ""}`}
+      } animate-toast-in`}
     >
       <div className="px-3 pt-2.5">
         <Waveform
