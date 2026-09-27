@@ -8,7 +8,8 @@ export const metadata: Metadata = { title: "Waiting for approval" };
 export const dynamic = "force-dynamic";
 
 export default async function PendingPage() {
-  const user = await currentUser();
+  // From the database, so "Check again" sees an approval at once.
+  const user = await currentUser({ fresh: true });
   if (!user) redirect("/login");
   if (user.approved) redirect("/");
 

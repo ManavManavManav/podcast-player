@@ -1,5 +1,7 @@
 import type { TranscriptSegment } from "@/lib/types";
 import type { ApiConfig } from "@/lib/server/config";
+import { AppError } from "@/lib/server/errors";
+import { fetchWithRetry } from "@/lib/server/retry";
 
 /**
  * Speech-to-text through any OpenAI-compatible `/audio/transcriptions`
@@ -62,19 +64,24 @@ export async function transcribe(
   if (language) form.append("language", language);
 
   const timeout = AbortSignal.timeout(TIMEOUT_MS);
-  const res = await fetch(`${config.baseUrl}/audio/transcriptions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${config.apiKey}` },
-    body: form,
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-  });
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const res = await fetchWithRetry(
+    () =>
+      fetch(`${config.baseUrl}/audio/transcriptions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${config.apiKey}` },
+        body: form,
+        signal: combined,
+      }),
+    { signal: combined, label: "transcription" },
+  );
   const body = (await res.json().catch(() => ({}))) as VerboseTranscription;
   if (!res.ok) {
     const message = typeof body.error === "string" ? body.error : body.error?.message;
-    throw new Error(`Transcription failed (${res.status}): ${message ?? res.statusText}`);
+    throw new AppError("transcription", `Transcription failed (${res.status}): ${message ?? res.statusText}`);
   }
   if (!Array.isArray(body.segments)) {
-    throw new Error("The transcription API didn't return timestamps (it needs to support verbose_json)");
+    throw new AppError("transcription", "The transcription API didn't return timestamps (it needs to support verbose_json)");
   }
   return {
     segments: parseTranscription(body, start, windowSeconds),

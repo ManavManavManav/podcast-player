@@ -65,6 +65,8 @@ export function Player({ userId }: { userId: string }) {
   const ignored = useRef<AdRange[]>([]);
   const skipped = useRef<AdRange[]>([]);
   const programmaticSeek = useRef(false);
+  /** Whether this episode's audio link has already been re-pinned after a load error. */
+  const repinned = useRef(false);
   const hold = useRef<{ frontier: number; timer: ReturnType<typeof setTimeout> } | null>(null);
   const holding = usePlayback((s) => s.holding);
 
@@ -107,6 +109,7 @@ export function Player({ userId }: { userId: string }) {
     if (!audio) return;
     ignored.current = [];
     skipped.current = [];
+    repinned.current = false;
     releaseHold(false);
     setNotice(null);
     // Stop the previous episode now; resolving the new one can take a moment,
@@ -307,7 +310,37 @@ export function Player({ userId }: { userId: string }) {
           usePlayer.getState().savePosition();
         }}
         onError={() => {
-          if (!audioRef.current?.getAttribute("src")) return;
+          const audio = audioRef.current;
+          const current = usePlayer.getState().episode;
+          if (!audio?.getAttribute("src") || !current) return;
+          if (!repinned.current) {
+            // Pinned links can expire (signed CDN URLs): pin a fresh one once and carry on.
+            repinned.current = true;
+            const resumeAt = lastTime.current;
+            const wasPlaying = usePlayback.getState().playing;
+            void fetch("/api/resolve", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: current.audioUrl, fresh: true }),
+            })
+              .then((res) => (res.ok ? res.json() : { url: current.audioUrl }))
+              .catch(() => ({ url: current.audioUrl }))
+              .then(({ url }: { url: string }) => {
+                if (usePlayer.getState().episode?.id !== current.id) return;
+                audio.addEventListener(
+                  "loadedmetadata",
+                  () => {
+                    programmaticSeek.current = true;
+                    audio.currentTime = resumeAt;
+                    if (wasPlaying) void audio.play().catch(() => {});
+                  },
+                  { once: true },
+                );
+                usePlayback.setState({ source: url });
+                audio.src = url;
+              });
+            return;
+          }
           usePlayback.setState({
             playing: false,
             buffering: false,
@@ -571,10 +604,12 @@ function useMediaSession() {
       album: "Podblock",
       artwork: episode.image ? [{ src: episode.image, sizes: "512x512" }] : [],
     });
-    const { toggle, skipBy, seek } = usePlayer.getState();
+    const { skipBy, seek } = usePlayer.getState();
+    // Explicit play and pause: a toggle would start playback on a "pause" from headphones.
+    const audio = () => usePlayback.getState().audio;
     const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
-      ["play", toggle],
-      ["pause", toggle],
+      ["play", () => void audio()?.play().catch(() => {})],
+      ["pause", () => audio()?.pause()],
       ["seekbackward", (d) => skipBy(-(d.seekOffset ?? BACK_SECONDS))],
       ["seekforward", (d) => skipBy(d.seekOffset ?? FORWARD_SECONDS)],
       ["seekto", (d) => d.seekTime !== undefined && seek(d.seekTime)],

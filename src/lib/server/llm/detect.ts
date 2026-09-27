@@ -1,5 +1,7 @@
 import type { AdRange, EpisodeContext, TranscriptSegment } from "@/lib/types";
 import type { ApiConfig } from "@/lib/server/config";
+import { AppError } from "@/lib/server/errors";
+import { fetchWithRetry } from "@/lib/server/retry";
 import { JSON_INSTRUCTIONS, SYSTEM_PROMPT, formatTranscript, parseAds } from "@/lib/server/llm/prompt";
 
 const TIMEOUT_MS = 90_000;
@@ -22,12 +24,12 @@ export interface Detection {
   outputTokens: number;
 }
 
-class ApiError extends Error {
+class ApiError extends AppError {
   constructor(
     readonly status: number,
     message: string,
   ) {
-    super(`Ad detection failed (${status}): ${message}`);
+    super("detection", `Ad detection failed (${status}): ${message}`);
   }
 }
 
@@ -48,7 +50,8 @@ export async function detectAds(
 
   const request = async (plain: boolean): Promise<ChatResponse> => {
     const timeout = AbortSignal.timeout(TIMEOUT_MS);
-    const res = await fetch(`${config.baseUrl}/chat/completions`, {
+    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    const send = () => fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
       body: JSON.stringify({
@@ -67,8 +70,9 @@ export async function detectAds(
               max_completion_tokens: 2048,
             }),
       }),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      signal: combined,
     });
+    const res = await fetchWithRetry(send, { signal: combined, label: "detection" });
     const body = (await res.json().catch(() => ({}))) as ChatResponse;
     if (!res.ok) {
       const message = typeof body.error === "string" ? body.error : body.error?.message;
@@ -94,7 +98,8 @@ export async function detectAds(
 
   const text = body.choices?.[0]?.message?.content;
   if (!text) {
-    throw new Error(
+    throw new AppError(
+      "detection",
       body.choices?.[0]?.finish_reason === "length"
         ? "The model ran out of tokens before answering"
         : "The model returned an empty answer",

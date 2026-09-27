@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Users" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const user = await currentUser();
+  const user = await currentUser({ fresh: true });
   if (!user) redirect("/login?next=/admin");
   if (user.role !== "admin") notFound();
 

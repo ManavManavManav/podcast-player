@@ -1,9 +1,14 @@
 import crypto from "node:crypto";
 import type { Episode, Podcast } from "@/lib/types";
+import { log } from "@/lib/server/log";
 import { stripHtml } from "@/lib/text";
 
-const API_BASE = "https://api.podcastindex.org/api/1.0";
+const DEFAULT_API_BASE = "https://api.podcastindex.org/api/1.0";
+/** PODCAST_INDEX_BASE_URL points the client at another server (end-to-end tests use a stub). */
+const apiBase = () => (process.env.PODCAST_INDEX_BASE_URL || DEFAULT_API_BASE).replace(/\/+$/, "");
 const USER_AGENT = "Podblock/1.0";
+/** Pages wait on these calls, so a slow API mustn't hang them. */
+const TIMEOUT_MS = 8_000;
 
 export class PodcastIndexError extends Error {
   constructor(
@@ -53,23 +58,39 @@ async function request<T>(
   const query = new URLSearchParams(
     Object.entries(params).map(([k, v]) => [k, String(v)]),
   );
-  const res = await fetch(`${API_BASE}/${endpoint}?${query}`, {
-    headers: {
-      "User-Agent": USER_AGENT,
-      "X-Auth-Date": authDate,
-      "X-Auth-Key": key,
-      Authorization: signature,
-    },
-    next: { revalidate },
-  });
-
-  if (!res.ok) {
-    throw new PodcastIndexError(
-      `Podcast Index request failed (${res.status})`,
-      res.status,
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(`${apiBase()}/${endpoint}?${query}`, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        "X-Auth-Date": authDate,
+        "X-Auth-Key": key,
+        Authorization: signature,
+      },
+      next: { revalidate },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new PodcastIndexError(
+        `Podcast Index request failed (${res.status})`,
+        res.status,
+      );
+    }
+    // Still inside the timeout: a body can stall too.
+    return (await res.json()) as T;
+  } catch (err) {
+    const failure =
+      err instanceof PodcastIndexError
+        ? err
+        : controller.signal.aborted
+          ? new PodcastIndexError("Podcast Index didn't answer in time")
+          : new PodcastIndexError(`Couldn't reach Podcast Index: ${(err as Error).message}`);
+    log.warn("podcastindex.failed", { endpoint, status: failure.status, message: failure.message });
+    throw failure;
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json() as Promise<T>;
 }
 
 // --- Raw API shapes (only the fields we use) -------------------------------
@@ -104,6 +125,17 @@ interface RawEpisode {
   feedLanguage?: string;
 }
 
+/** Feed-supplied links are rendered as hrefs, so only http(s) ones are kept. */
+function webLink(value: string | undefined): string {
+  const link = value?.trim() ?? "";
+  try {
+    const { protocol } = new URL(link);
+    return protocol === "http:" || protocol === "https:" ? link : "";
+  } catch {
+    return "";
+  }
+}
+
 function toPodcast(feed: RawFeed): Podcast {
   return {
     id: feed.id,
@@ -114,7 +146,7 @@ function toPodcast(feed: RawFeed): Podcast {
     language: feed.language ?? "",
     categories: feed.categories ? Object.values(feed.categories) : [],
     episodeCount: feed.episodeCount ?? 0,
-    link: feed.link ?? "",
+    link: webLink(feed.link),
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle, RefreshCw, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { retryScanning } from "@/hooks/useAdScanner";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { formatClock, formatDuration } from "@/lib/text";
@@ -86,19 +86,29 @@ function ScanStatus() {
   );
 }
 
+/** Index of the last line starting at or before `time` (lines are sorted), or -1. */
+function lineAt(segments: TranscriptSegment[], time: number): number {
+  let low = 0;
+  let high = segments.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (segments[mid].start <= time) {
+      found = mid;
+      low = mid + 1;
+    } else high = mid - 1;
+  }
+  return found;
+}
+
 function Transcript() {
   const segments = useAnalysis((s) => s.segments);
   const ads = useAnalysis((s) => s.ads);
-  const currentTime = usePlayback((s) => s.currentTime);
+  // The current line, not the time: playback ticks ~4×/s, lines change every few seconds.
+  const activeIndex = usePlayback((s) => lineAt(segments, s.currentTime));
   const seek = usePlayer((s) => s.seek);
   const container = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
-
-  const activeIndex = useMemo(() => {
-    let index = -1;
-    for (let i = 0; i < segments.length && segments[i].start <= currentTime; i++) index = i;
-    return index;
-  }, [segments, currentTime]);
 
   // Keep the current line in view unless the listener has scrolled away.
   useEffect(() => {
@@ -113,7 +123,7 @@ function Transcript() {
     return (
       <div className="grid flex-1 place-items-center p-10 text-center text-sm text-muted">
         <div className="flex items-center gap-2">
-          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Transcribing the first minute…
+          <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> Transcribing…
         </div>
       </div>
     );
@@ -129,7 +139,7 @@ function Transcript() {
       >
         {segments.map((segment, i) => (
           <TranscriptLine
-            key={segment.start}
+            key={`${segment.start}-${segment.end}`}
             index={i}
             segment={segment}
             active={i === activeIndex}
@@ -151,7 +161,8 @@ function Transcript() {
   );
 }
 
-function TranscriptLine({
+/** Memoized: in a long transcript only the lines whose state changed re-render. */
+const TranscriptLine = memo(function TranscriptLine({
   segment,
   index,
   active,
@@ -180,7 +191,7 @@ function TranscriptLine({
       <span className="min-w-0 flex-1">{segment.text}</span>
     </button>
   );
-}
+});
 
 function AdList() {
   const ads = useAnalysis((s) => s.ads);
@@ -210,7 +221,7 @@ function AdList() {
             .join(" ");
           const status = currentTime >= ad.end ? "Passed" : currentTime >= ad.start ? "Playing" : "Upcoming";
           return (
-            <li key={ad.start}>
+            <li key={`${ad.start}-${ad.end}`}>
               <button
                 onClick={() => seek(ad.start)}
                 className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-2xl bg-ad-soft px-4 py-3.5 text-left"

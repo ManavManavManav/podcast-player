@@ -1,6 +1,7 @@
 {
   "name": "podblock",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,14 +10,18 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm test",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "fake-providers": "node scripts/fake-providers.mjs",
+    "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@libsql/client": "^0.18.0",
     "@libsql/kysely-libsql": "^0.4.1",
     "better-auth": "^1.7.5",
+    "ffmpeg-static": "5.3.0",
     "lucide-react": "^1.47.0",
     "next": "^16.3.6",
     "react": "^19.3.0",
@@ -24,18 +29,27 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
-    "@types/node": "^22.20.4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitest/coverage-v8": "^5.0.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.6",
+    "happy-dom": "^20.14.5",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   },
   "description": "A podcast player that transcribes ahead of you and skips the ads.",
   "engines": {
-    "node": ">=20.9"
+    "node": ">=22"
+  },
+  "allowScripts": {
+    "ffmpeg-static@5.3.0": true
   }
 }

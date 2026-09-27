@@ -1,8 +1,10 @@
+import { APIError } from "better-auth/api";
 import { headers } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { approveUser, listUsers } from "@/lib/server/admin";
 import { getAuth } from "@/lib/server/auth";
 import { rejectCrossSite } from "@/lib/server/guard";
+import { log, withRequestContext } from "@/lib/server/log";
 import { requireAdmin } from "@/lib/server/session";
 import { deleteUsage } from "@/lib/server/usage";
 
@@ -10,7 +12,11 @@ type Action = "approve" | "disable" | "enable" | "delete" | "set-password";
 const ACTIONS: Action[] = ["approve", "disable", "enable", "delete", "set-password"];
 
 /** Approves, disables, re-enables or deletes an account, or sets its password. */
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+  return withRequestContext(req, () => act(req, context));
+}
+
+async function act(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const refused = rejectCrossSite(req);
   if (refused) return refused;
   const admin = await requireAdmin();
@@ -55,7 +61,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message || "That didn't work" }, { status: 500 });
+    // Better Auth's own refusals are written for people; anything else stays in the log.
+    if (err instanceof APIError) {
+      log.warn("admin.action", { adminId: admin.id, action, targetId: id, targetEmail: target.email, ok: false, reason: err.message });
+      return NextResponse.json({ error: err.message || "That didn't work" }, { status: err.statusCode });
+    }
+    log.error("admin.action", { adminId: admin.id, action, targetId: id, targetEmail: target.email, ok: false, err });
+    return NextResponse.json({ error: "That didn't work. Try again, or check the server log." }, { status: 500 });
   }
+  log.info("admin.action", { adminId: admin.id, action, targetId: id, targetEmail: target.email, ok: true });
   return NextResponse.json(await listUsers());
 }
