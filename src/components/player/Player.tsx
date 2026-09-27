@@ -372,6 +372,7 @@ function PlayerBar() {
   const { toggle, skipBy, seek, stop } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
+  const segments = useAnalysis((s) => s.segments);
   // Started from a play button's burst: stay hidden until the sticks land here.
   const [materialize] = useState(burstInProgress);
 
@@ -427,7 +428,7 @@ function PlayerBar() {
       </div>
 
       <div className="mt-1.5">
-        <Timeline currentTime={currentTime} duration={duration} ads={ads} windows={windows} onSeek={seek} />
+        <Timeline currentTime={currentTime} duration={duration} ads={ads} windows={windows} segments={segments} onSeek={seek} />
       </div>
 
       <div className="flex items-center justify-between md:hidden">

@@ -23,6 +23,8 @@
   --ad-text: #b03a0a;
   --danger: #d92d20;
   --shadow: none;
+  /* Parts of the seek bar already scanned for ads. */
+  --scanned: color-mix(in srgb, var(--text) 16%, transparent);
   /* Floating layers (menus) still need to lift off the page. */
   --shadow-float: 0 12px 32px -12px rgb(0 0 0 / 0.18);
   color-scheme: light;
@@ -65,6 +67,7 @@
   --color-ad-soft: var(--ad-soft);
   --color-ad-text: var(--ad-text);
   --color-danger: var(--danger);
+  --color-scanned: var(--scanned);
   --shadow-card: var(--shadow);
   --shadow-float: var(--shadow-float);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;

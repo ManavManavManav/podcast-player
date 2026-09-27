@@ -39,3 +39,39 @@ describe("Timeline keyboard", () => {
     expect(onSeek).not.toHaveBeenCalled();
   });
 });
+
+describe("Timeline preview", () => {
+  const ads = [{ start: 20, end: 50, confidence: 1, reason: "Ad: Acme" }];
+  const segments = [
+    { start: 0, end: 20, text: "Welcome back to the show." },
+    { start: 20, end: 50, text: "This episode is brought to you by Acme." },
+  ];
+
+  function hoverAt(clientX: number) {
+    render(<Timeline currentTime={0} duration={100} ads={ads} windows={{}} segments={segments} onSeek={() => {}} />);
+    const slider = screen.getByRole("slider", { name: "Seek" });
+    slider.getBoundingClientRect = () => ({ left: 0, width: 100, top: 0, height: 32, right: 100, bottom: 32, x: 0, y: 0, toJSON() {} });
+    fireEvent.pointerMove(slider, { clientX, pointerType: "mouse" });
+  }
+
+  it("shows the time and what's said there", () => {
+    hoverAt(10);
+    expect(screen.getByText("0:10")).toBeTruthy();
+    expect(screen.getByText("Welcome back to the show.")).toBeTruthy();
+    expect(screen.queryByText(/Acme$/)).toBeNull();
+  });
+
+  it("names the ad under the pointer", () => {
+    hoverAt(30);
+    expect(screen.getByText(/Ad ·/).textContent).toMatch(/Ad · Acme/);
+    expect(screen.getByText("This episode is brought to you by Acme.")).toBeTruthy();
+  });
+
+  it("draws short ads at least 3 px wide", () => {
+    const { container } = render(
+      <Timeline currentTime={0} duration={3600} ads={[{ start: 60, end: 90, confidence: 1, reason: "Ad" }]} windows={{}} onSeek={() => {}} />,
+    );
+    const marker = container.querySelector<HTMLElement>(".bg-ad")!;
+    expect(marker.style.minWidth).toBe("3px");
+  });
+});

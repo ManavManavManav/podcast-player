@@ -120,6 +120,13 @@ async function walk(name, contextOptions, signUp) {
 
   await page.getByRole("button", { name: /^Play / }).first().click();
   await shot("playing", { wait: 6000 });
+  if (!contextOptions.hasTouch) {
+    // Hover inside the fixture's first ad (0:20–0:50 of 10:00) to show the seek preview.
+    const bar = await page.getByRole("slider", { name: "Seek" }).boundingBox();
+    await page.mouse.move(bar.x + bar.width * 0.055, bar.y + bar.height / 2);
+    await shot("seek-preview", { wait: 400 });
+    await page.mouse.move(0, 0);
+  }
   await page.keyboard.press("t");
   await shot("transcript", { wait: 2500 });
   await page.getByRole("tab", { name: /Ad/ }).click();

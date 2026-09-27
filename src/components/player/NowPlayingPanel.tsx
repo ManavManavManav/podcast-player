@@ -3,6 +3,7 @@
 import { LoaderCircle, RefreshCw, X } from "lucide-react";
 import { memo, useEffect, useId, useRef, useState } from "react";
 import { retryScanning } from "@/hooks/useAdScanner";
+import { advertiser } from "@/lib/ads/label";
 import { WINDOW_SECONDS } from "@/lib/analysis";
 import { formatClock, formatDuration } from "@/lib/text";
 import type { AdRange, TranscriptSegment } from "@/lib/types";
@@ -291,13 +292,4 @@ function AdList() {
       </ul>
     </div>
   );
-}
-
-/** "Ad: Sierra" → "Sierra"; several merged ads read "Ad: A; Ad: B" → "A, B". */
-function advertiser(ad: AdRange): string {
-  const names = ad.reason
-    .split(";")
-    .map((part) => part.trim().replace(/^Ad:?\s*/i, ""))
-    .filter(Boolean);
-  return names.length ? [...new Set(names)].join(", ") : "Ad";
 }
