@@ -19,7 +19,14 @@ const episode = (id: number, duration = 3600): Episode => ({
 });
 
 beforeEach(() => {
-  usePlayer.setState({ episode: null, positions: {}, recent: [], stats: { adsSkipped: 0, secondsSaved: 0 }, autoplay: false });
+  usePlayer.setState({
+    episode: null,
+    positions: {},
+    recent: [],
+    following: {},
+    stats: { adsSkipped: 0, secondsSaved: 0 },
+    autoplay: false,
+  });
   usePlayback.setState({ audio: null, currentTime: 0, duration: 0, playing: false });
 });
 
@@ -94,5 +101,46 @@ describe("player store", () => {
     usePlayer.getState().setSleep(null);
     expect(usePlayer.getState().sleepAt).toBeNull();
     vi.useRealTimers();
+  });
+});
+
+describe("what plays next", () => {
+  // A show's list, newest first as feeds are: episode n was published on day n.
+  const show = [5, 4, 3, 2, 1].map((n) => ({ ...episode(n), publishedAt: n * 86_400, description: "long show notes" }));
+
+  it("goes to the next older episode by default", () => {
+    usePlayer.getState().play(show[0], show);
+    expect(usePlayer.getState().nextAfter(show[0])?.id).toBe(4);
+  });
+
+  it("goes newer when you've been catching up in order", () => {
+    usePlayer.getState().play(show[4], show); // episode 1
+    usePlayer.getState().play(show[3], show); // then episode 2
+    expect(usePlayer.getState().nextAfter(show[3])?.id).toBe(3);
+  });
+
+  it("skips episodes already played", () => {
+    usePlayer.setState({ positions: { "4": { time: 3590, duration: 3600, updatedAt: 1 } } });
+    usePlayer.getState().play(show[0], show);
+    expect(usePlayer.getState().nextAfter(show[0])?.id).toBe(3);
+  });
+
+  it("has nothing next without a list", () => {
+    usePlayer.getState().play(episode(9));
+    expect(usePlayer.getState().nextAfter(episode(9))).toBeNull();
+  });
+
+  it("has nothing next after the oldest episode", () => {
+    usePlayer.getState().play(show[4], show);
+    expect(usePlayer.getState().nextAfter(show[4])).toBeNull();
+  });
+
+  it("keeps neighbours without their descriptions, and only for recent episodes", () => {
+    usePlayer.getState().play(show[0], show);
+    const kept = usePlayer.getState().following["5"];
+    expect(kept.older.map((e) => e.id)).toEqual([4, 3, 2, 1]);
+    expect(kept.older.every((e) => e.description === "")).toBe(true);
+    for (let i = 100; i < 113; i++) usePlayer.getState().play(episode(i));
+    expect(usePlayer.getState().following["5"]).toBeUndefined();
   });
 });

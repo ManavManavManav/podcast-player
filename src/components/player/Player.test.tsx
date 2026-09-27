@@ -190,6 +190,63 @@ describe("loading", () => {
   });
 });
 
+describe("load errors", () => {
+  it("says so under the title, and Retry loads the episode again", async () => {
+    await act(async () => fireEvent.error(audio)); // re-pinned once
+    await act(async () => fireEvent.error(audio)); // then reported
+    expect(screen.getByText(/Couldn't load this episode's audio/)).toBeTruthy();
+    const pinsBefore = resolveCalls.length;
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Retry" })));
+    expect(resolveCalls.length).toBe(pinsBefore + 1);
+    expect(usePlayback.getState().error).toBeNull();
+    expect(screen.queryByText(/Couldn't load/)).toBeNull();
+  });
+});
+
+describe("end of episode", () => {
+  const next = { ...episode, id: 8, title: "The next one", publishedAt: 50 } as Episode;
+
+  function reachTheEnd() {
+    act(() => {
+      usePlayer.setState({ recent: [episode], following: { "7": { newer: [], older: [next] } } });
+      audio.currentTime = 1799;
+      fireEvent.timeUpdate(audio);
+      fireEvent.ended(audio);
+    });
+  }
+
+  it("counts down, then starts the next episode", () => {
+    vi.useFakeTimers();
+    reachTheEnd();
+    expect(screen.getByText(/Up next in/).textContent).toMatch(/Up next in 5: The next one/);
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(usePlayer.getState().episode?.id).toBe(8);
+    expect(usePlayer.getState().autoplay).toBe(true);
+  });
+
+  it("stops at Finished when cancelled, and can replay", () => {
+    vi.useFakeTimers();
+    reachTheEnd();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(usePlayer.getState().episode?.id).toBe(7);
+    expect(screen.getByText(/^Finished/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    expect(audio.currentTime).toBe(0);
+    expect(paused).toBe(false);
+  });
+
+  it("doesn't start anything when auto-start is off", () => {
+    vi.useFakeTimers();
+    act(() => usePlayer.setState({ autoNext: false }));
+    reachTheEnd();
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(usePlayer.getState().episode?.id).toBe(7);
+    expect(screen.getByText(/^Finished/)).toBeTruthy();
+    act(() => usePlayer.setState({ autoNext: true }));
+  });
+});
+
 describe("media keys", () => {
   it("pauses on pause and plays on play, whatever the current state", () => {
     paused = true;

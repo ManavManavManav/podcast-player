@@ -20,13 +20,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Artwork } from "@/components/Artwork";
 import { MenuItem, Popover } from "@/components/player/Popover";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
-import { BAR_FADE_MS, BAR_REVEAL_MS, burstInProgress } from "@/components/player/PlayBurst";
+import { BAR_FADE_MS, BAR_REVEAL_MS, barShouldMaterialize } from "@/components/player/PlayBurst";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
 import { Timeline } from "@/components/player/Timeline";
 import { IconButton } from "@/components/ui/IconButton";
 import { useAdScanner } from "@/hooks/useAdScanner";
 import { WINDOW_SECONDS, windowStartFor } from "@/lib/analysis";
-import { formatClock } from "@/lib/text";
+import { formatClock, formatDuration } from "@/lib/text";
 import type { AdRange } from "@/lib/types";
 import { adAt, useAnalysis } from "@/store/analysis";
 import { BACK_SECONDS, FORWARD_SECONDS, PLAYBACK_RATES, usePlayback, usePlayer } from "@/store/player";
@@ -36,6 +36,8 @@ const SLEEP_OPTIONS = [5, 15, 30, 45, 60];
 const MIN_REMAINING = 1.5;
 /** Longest we'll wait at the end of an ad break to learn whether it continues. */
 const MAX_HOLD_MS = 15_000;
+/** How long "Up next" counts down before the next episode starts. */
+export const UP_NEXT_DELAY_MS = 5_000;
 
 /**
  * Ad ranges get recomputed (and can grow) as more of the episode is
@@ -101,6 +103,7 @@ export function Player({ userId }: { userId: string }) {
   }, []);
 
   useAdScanner(Boolean(episode));
+  const reloadToken = usePlayback((s) => s.reloadToken);
 
   // --- Load a new episode ---------------------------------------------------------
   useEffect(() => {
@@ -111,6 +114,7 @@ export function Player({ userId }: { userId: string }) {
     repinned.current = false;
     releaseHold(false);
     setNotice(null);
+    usePlayback.setState({ ended: false, upNext: null, upNextAt: null, episodeSkips: { count: 0, seconds: 0 } });
     // Stop the previous episode now; resolving the new one can take a moment,
     // and its time updates would otherwise be saved as the new one's position.
     audio.pause();
@@ -165,7 +169,8 @@ export function Player({ userId }: { userId: string }) {
       cancelled = true;
       audio.removeEventListener("loadedmetadata", onReady);
     };
-  }, [episode, releaseHold]);
+    // reloadToken: Retry after an error loads the same episode again.
+  }, [episode, reloadToken, releaseHold]);
 
   // --- Settings → element -------------------------------------------------------------
   const volume = usePlayer((s) => s.volume);
@@ -201,6 +206,9 @@ export function Player({ userId }: { userId: string }) {
     lastTime.current = ad.end;
     usePlayback.setState({ currentTime: ad.end });
     usePlayer.getState().recordSkip(ad.end - t, firstHop);
+    usePlayback.setState(({ episodeSkips }) => ({
+      episodeSkips: { count: episodeSkips.count + (firstHop ? 1 : 0), seconds: episodeSkips.seconds + (ad.end - t) },
+    }));
     setNotice((previous) => ({
       ad,
       seconds: (firstHop || !previous ? 0 : previous.seconds) + (ad.end - t),
@@ -279,6 +287,14 @@ export function Player({ userId }: { userId: string }) {
     return () => clearTimeout(timer);
   }, [sleepAt]);
 
+  // --- Up next ---------------------------------------------------------------------------
+  const upNextAt = usePlayback((s) => s.upNextAt);
+  useEffect(() => {
+    if (upNextAt === null) return;
+    const timer = setTimeout(playUpNext, Math.max(0, upNextAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [upNextAt]);
+
   useMediaSession();
   useKeyboardShortcuts();
   const dock = usePlayerSpace(Boolean(episode));
@@ -292,7 +308,7 @@ export function Player({ userId }: { userId: string }) {
         onSeeking={onSeeking}
         onPlay={() => {
           releaseHold(false);
-          usePlayback.setState({ playing: true, error: null });
+          usePlayback.setState({ playing: true, error: null, ended: false, upNext: null, upNextAt: null });
         }}
         onPause={() => {
           usePlayback.setState({ playing: false });
@@ -306,8 +322,15 @@ export function Player({ userId }: { userId: string }) {
           if (Number.isFinite(d) && d > 0) usePlayback.setState({ duration: d });
         }}
         onEnded={() => {
-          usePlayback.setState({ playing: false });
-          usePlayer.getState().savePosition();
+          const player = usePlayer.getState();
+          player.savePosition();
+          const next = player.episode && player.autoNext ? player.nextAfter(player.episode) : null;
+          usePlayback.setState({
+            playing: false,
+            ended: true,
+            upNext: next,
+            upNextAt: next ? Date.now() + UP_NEXT_DELAY_MS : null,
+          });
         }}
         onError={() => {
           const audio = audioRef.current;
@@ -364,17 +387,26 @@ export function Player({ userId }: { userId: string }) {
   );
 }
 
+/** Starts the episode counted down to, carrying its neighbours over so the one after can follow. */
+function playUpNext() {
+  const { upNext } = usePlayback.getState();
+  const player = usePlayer.getState();
+  if (!upNext || !player.episode) return;
+  const around = player.following[String(player.episode.id)];
+  player.play(upNext, around ? [...around.newer, player.episode, ...around.older] : undefined);
+}
+
 // --- Bar --------------------------------------------------------------------------------
 
 function PlayerBar() {
   const episode = usePlayer((s) => s.episode)!;
-  const { playing, buffering, holding, currentTime, duration, error } = usePlayback();
+  const { playing, buffering, holding, currentTime, duration } = usePlayback();
   const { toggle, skipBy, seek, stop } = usePlayer();
   const ads = useAnalysis((s) => s.ads);
   const windows = useAnalysis((s) => s.windows);
   const segments = useAnalysis((s) => s.segments);
   // Started from a play button's burst: stay hidden until the sticks land here.
-  const [materialize] = useState(burstInProgress);
+  const [materialize] = useState(barShouldMaterialize);
 
   return (
     <div
@@ -390,9 +422,7 @@ function PlayerBar() {
         </Link>
         <div className="min-w-0 flex-1">
           <p className="truncate font-serif text-lg leading-tight">{episode.title}</p>
-          <p className="truncate text-meta text-muted">
-            {error ? <span className="text-danger">{error}</span> : episode.podcastTitle}
-          </p>
+          <StatusLine podcastTitle={episode.podcastTitle} />
         </div>
 
         <div className="flex items-center gap-0.5 sm:gap-1.5">
@@ -405,7 +435,8 @@ function PlayerBar() {
             aria-label={playing ? "Pause" : "Play"}
             className="hover-breathe grid size-12 place-items-center rounded-full bg-accent text-accent-text [--hover-scale:1.08]"
           >
-            {(buffering && playing) || holding ? (
+            {/* Loading (buffering before the first play), buffering mid-play, or holding at an ad break. */}
+            {buffering || holding ? (
               <LoaderCircle className="size-5 animate-spin" />
             ) : playing ? (
               <Pause className="size-5 fill-current" />
@@ -444,6 +475,102 @@ function PlayerBar() {
       </div>
     </div>
   );
+}
+
+/**
+ * The line under the title: the show's name, or what the player is doing
+ * when that matters more (loading, waiting on an ad break, an error, the
+ * end of the episode).
+ */
+function StatusLine({ podcastTitle }: { podcastTitle: string }) {
+  const source = usePlayback((s) => s.source);
+  const playing = usePlayback((s) => s.playing);
+  const buffering = usePlayback((s) => s.buffering);
+  const holding = usePlayback((s) => s.holding);
+  const error = usePlayback((s) => s.error);
+  const ended = usePlayback((s) => s.ended);
+  const upNext = usePlayback((s) => s.upNext);
+  const upNextAt = usePlayback((s) => s.upNextAt);
+  const skips = usePlayback((s) => s.episodeSkips);
+
+  const action = "shrink-0 font-medium text-text underline underline-offset-2 hover:text-muted";
+  let content: React.ReactNode;
+  if (error) {
+    content = (
+      <>
+        <span className="truncate text-danger">Couldn&apos;t load this episode&apos;s audio.</span>
+        <button
+          className={action}
+          onClick={() => {
+            usePlayer.setState({ autoplay: true });
+            usePlayback.setState((s) => ({ error: null, reloadToken: s.reloadToken + 1 }));
+          }}
+        >
+          Retry
+        </button>
+      </>
+    );
+  } else if (ended && upNext && upNextAt) {
+    content = (
+      <>
+        <span className="truncate">
+          Up next in <Countdown until={upNextAt} />: {upNext.title}
+        </span>
+        <button className={action} onClick={playUpNext}>
+          Play now
+        </button>
+        <button className={action} onClick={() => usePlayback.setState({ upNext: null, upNextAt: null })}>
+          Cancel
+        </button>
+      </>
+    );
+  } else if (ended) {
+    content = (
+      <>
+        <span className="truncate">
+          Finished
+          {skips.count > 0 &&
+            ` · skipped ${skips.count} ${skips.count === 1 ? "ad" : "ads"}, ${formatDuration(skips.seconds)}`}
+        </span>
+        <button
+          className={action}
+          onClick={() => {
+            usePlayer.getState().seek(0);
+            void usePlayback.getState().audio?.play().catch(() => {});
+          }}
+        >
+          Replay
+        </button>
+      </>
+    );
+  } else if (holding || !source || buffering) {
+    content = (
+      <>
+        <LoaderCircle className="size-3 shrink-0 animate-spin" aria-hidden="true" />
+        <span className="truncate">
+          {holding ? "Waiting for the rest of this ad break…" : playing ? "Buffering…" : "Loading…"}
+        </span>
+      </>
+    );
+  } else {
+    content = <span className="truncate">{podcastTitle}</span>;
+  }
+
+  return (
+    <p role="status" aria-live="polite" className="flex min-w-0 items-center gap-2 text-meta text-muted">
+      {content}
+    </p>
+  );
+}
+
+/** Whole seconds left until `until`, ticking. */
+function Countdown({ until }: { until: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="font-mono tabular-nums">{Math.max(0, Math.ceil((until - now) / 1000))}</span>;
 }
 
 function SecondaryControls() {

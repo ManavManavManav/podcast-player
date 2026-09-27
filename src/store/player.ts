@@ -30,6 +30,15 @@ interface PlaybackState {
   currentTime: number;
   duration: number;
   error: string | null;
+  /** Bumped to load the current episode's audio again (Retry after an error). */
+  reloadToken: number;
+  /** Playback reached the end of the episode. */
+  ended: boolean;
+  /** Ads skipped in this episode so far, and the seconds saved. */
+  episodeSkips: { count: number; seconds: number };
+  /** After the episode ends: what plays next, and when (Unix ms). Null when cancelled or there's nothing next. */
+  upNext: Episode | null;
+  upNextAt: number | null;
 }
 
 export const usePlayback = create<PlaybackState>()(() => ({
@@ -41,6 +50,11 @@ export const usePlayback = create<PlaybackState>()(() => ({
   currentTime: 0,
   duration: 0,
   error: null,
+  reloadToken: 0,
+  ended: false,
+  episodeSkips: { count: 0, seconds: 0 },
+  upNext: null,
+  upNextAt: null,
 }));
 
 // --- Persisted player state ------------------------------------------------------
@@ -67,8 +81,17 @@ interface PlayerState {
   positions: Record<string, SavedPosition>;
   recent: Episode[];
   stats: { adsSkipped: number; secondsSaved: number };
+  /** Whether the next episode starts by itself when one ends. */
+  autoNext: boolean;
+  /**
+   * For recently played episodes: the neighbouring episodes of the same show,
+   * from the list they were played from, so the next one can start without
+   * fetching the feed again.
+   */
+  following: Record<string, Neighbours>;
 
-  play: (episode: Episode) => void;
+  /** Plays `episode`; `list` is the show's episode list it was chosen from, if any. */
+  play: (episode: Episode, list?: Episode[]) => void;
   toggle: () => void;
   seek: (time: number) => void;
   skipBy: (seconds: number) => void;
@@ -83,11 +106,23 @@ interface PlayerState {
   recordSkip: (seconds: number, newAd: boolean) => void;
   savePosition: () => void;
   resumePoint: (episode: Episode) => number;
+  setAutoNext: (on: boolean) => void;
+  /** The episode to play after `episode` ends, or null. */
+  nextAfter: (episode: Episode) => Episode | null;
+}
+
+interface Neighbours {
+  /** Up to a few newer episodes, nearest first. */
+  newer: Episode[];
+  /** Up to a few older episodes, nearest first. */
+  older: Episode[];
 }
 
 const noStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 const RECENT_LIMIT = 12;
+/** Neighbours kept on each side: enough to step past a few already-played episodes. */
+const NEIGHBOUR_LIMIT = 4;
 const POSITION_LIMIT = 300;
 /** Past this many seconds from the end, an episode counts as finished. */
 const FINISHED_MARGIN = 30;
@@ -112,19 +147,23 @@ export const usePlayer = create<PlayerState>()(
       positions: {},
       recent: [],
       stats: { adsSkipped: 0, secondsSaved: 0 },
+      autoNext: true,
+      following: {},
 
-      play: (episode) => {
+      play: (episode, list) => {
         const { audio } = usePlayback.getState();
         if (get().episode?.id === episode.id) {
           if (audio?.paused) void audio.play().catch(() => {});
           return;
         }
         get().savePosition();
-        set((s) => ({
-          episode,
-          autoplay: true,
-          recent: [episode, ...s.recent.filter((e) => e.id !== episode.id)].slice(0, RECENT_LIMIT),
-        }));
+        set((s) => {
+          const recent = [episode, ...s.recent.filter((e) => e.id !== episode.id)].slice(0, RECENT_LIMIT);
+          const keep = new Set(recent.map(positionKey));
+          const following = Object.fromEntries(Object.entries(s.following).filter(([id]) => keep.has(id)));
+          if (list) following[positionKey(episode)] = neighbours(episode, list);
+          return { episode, autoplay: true, recent, following };
+        });
         // <Player> reacts to the episode change: loads, resumes and plays.
       },
 
@@ -181,6 +220,24 @@ export const usePlayer = create<PlayerState>()(
         }));
       },
 
+      setAutoNext: (autoNext) => set({ autoNext }),
+
+      nextAfter: (episode) => {
+        const { following, recent, positions } = get();
+        const around = following[positionKey(episode)];
+        if (!around) return null;
+        // Keep going the way you've been listening: if the show's previous episode you played is
+        // older than this one, you're catching up in order, so go newer; otherwise go older.
+        const previous = recent.find((e) => e.id !== episode.id && e.podcastId === episode.podcastId);
+        const candidates = previous && previous.publishedAt < episode.publishedAt ? around.newer : around.older;
+        const finished = (e: Episode) => {
+          const saved = positions[positionKey(e)];
+          const duration = saved?.duration || e.duration;
+          return Boolean(saved && duration && saved.time > duration - FINISHED_MARGIN);
+        };
+        return candidates.find((e) => !finished(e)) ?? null;
+      },
+
       resumePoint: (episode) => {
         const saved = get().positions[positionKey(episode)];
         if (!saved || saved.time < 5) return 0;
@@ -206,10 +263,30 @@ export const usePlayer = create<PlayerState>()(
         positions: s.positions,
         recent: s.recent,
         stats: s.stats,
+        autoNext: s.autoNext,
+        following: s.following,
       }),
     },
   ),
 );
+
+/** The episodes either side of `episode` in its show's list, nearest first, without their long descriptions. */
+function neighbours(episode: Episode, list: Episode[]): Neighbours {
+  const slim = (e: Episode): Episode => ({ ...e, description: "" });
+  const others = list.filter((e) => e.id !== episode.id && e.podcastId === episode.podcastId);
+  return {
+    newer: others
+      .filter((e) => e.publishedAt > episode.publishedAt)
+      .sort((a, b) => a.publishedAt - b.publishedAt)
+      .slice(0, NEIGHBOUR_LIMIT)
+      .map(slim),
+    older: others
+      .filter((e) => e.publishedAt < episode.publishedAt)
+      .sort((a, b) => b.publishedAt - a.publishedAt)
+      .slice(0, NEIGHBOUR_LIMIT)
+      .map(slim),
+  };
+}
 
 function prune(positions: Record<string, SavedPosition>) {
   const entries = Object.entries(positions);

@@ -36,10 +36,16 @@ const CELL = 14;
 const GAP = 1.5;
 
 let lastBurstAt = 0;
+/** Whether a player bar was already on screen when the burst started. */
+let barWasShown = false;
 
-/** True right after a burst, so the bar knows to wait for the sticks before appearing. */
-export function burstInProgress() {
-  return Date.now() - lastBurstAt < 400;
+/**
+ * True right after a burst that brings the player bar in, so the new bar waits
+ * for the sticks before appearing. When a bar is already on screen (switching
+ * episodes), the sticks rebuild it in place and it never disappears.
+ */
+export function barShouldMaterialize() {
+  return Date.now() - lastBurstAt < 400 && !barWasShown;
 }
 
 /** Starts the flourish from the center of `origin` (the play button that was pressed). */
@@ -47,6 +53,7 @@ export function playBurst(origin: Element | null) {
   if (!origin || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const rect = origin.getBoundingClientRect();
   lastBurstAt = Date.now();
+  barWasShown = document.querySelector("[data-player-bar]") !== null;
   window.dispatchEvent(
     new CustomEvent(EVENT, { detail: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } }),
   );

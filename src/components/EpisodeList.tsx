@@ -1,6 +1,6 @@
 "use client";
 
-import { Pause, Play } from "lucide-react";
+import { LoaderCircle, Pause, Play } from "lucide-react";
 import { useRef } from "react";
 import { playBurst } from "@/components/player/PlayBurst";
 import { formatDate, formatDuration } from "@/lib/text";
@@ -11,15 +11,17 @@ export function EpisodeList({ episodes }: { episodes: Episode[] }) {
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-4 sm:px-6">
       {episodes.map((episode) => (
-        <EpisodeRow key={episode.id} episode={episode} />
+        <EpisodeRow key={episode.id} episode={episode} list={episodes} />
       ))}
     </ul>
   );
 }
 
-function EpisodeRow({ episode }: { episode: Episode }) {
+function EpisodeRow({ episode, list }: { episode: Episode; list: Episode[] }) {
   const isCurrent = usePlayer((s) => s.episode?.id === episode.id);
   const playing = usePlayback((s) => s.playing) && isCurrent;
+  // Feedback from the moment of the click, before the audio is ready.
+  const loading = usePlayback((s) => s.buffering && !s.playing) && isCurrent;
   const progress = useEpisodeProgress(episode);
   const play = usePlayer((s) => s.play);
   const toggle = usePlayer((s) => s.toggle);
@@ -29,7 +31,7 @@ function EpisodeRow({ episode }: { episode: Episode }) {
   const onClick = () => {
     if (isCurrent) return toggle();
     playBurst(playButton.current);
-    play(episode);
+    play(episode, list);
   };
   const remaining = episode.duration ? episode.duration * (1 - progress) : 0;
   const started = progress > 0.01;
@@ -53,7 +55,13 @@ function EpisodeRow({ episode }: { episode: Episode }) {
             : "bg-surface-2 text-text group-hover:bg-accent group-hover:text-accent-text"
         }`}
       >
-        {playing ? <Pause className="size-4 fill-current" /> : <Play className="ml-0.5 size-4 fill-current" />}
+        {loading ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : playing ? (
+          <Pause className="size-4 fill-current" />
+        ) : (
+          <Play className="ml-0.5 size-4 fill-current" />
+        )}
         {started && !finished && !isCurrent && <ProgressRing progress={progress} />}
       </button>
       <div className="min-w-0 flex-1">
