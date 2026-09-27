@@ -34,7 +34,7 @@ export function SkipToast({
 
   return (
     <div className="mb-2 flex justify-center" role="status" aria-live="polite">
-      <div key={notice.at} className="animate-toast-in flex items-center gap-3 rounded-full bg-text py-1.5 pl-3 pr-1.5 text-sm text-bg shadow-card">
+      <div key={notice.at} className="animate-toast-in flex items-center gap-3 bg-text py-1.5 pl-3 pr-1.5 font-grotesk text-sm text-bg shadow-float">
         {holding ? (
           <LoaderCircle className="size-4 animate-spin text-ad" aria-hidden="true" />
         ) : (
@@ -43,7 +43,7 @@ export function SkipToast({
         <span>
           {holding ? "Skipping ad break…" : `Skipped a ${formatDuration(notice.seconds)} ad`}
         </span>
-        <button onClick={onUndo} className="hover-breathe rounded-full bg-bg/15 px-3 py-1 text-xs font-semibold hover:bg-bg/25">
+        <button onClick={onUndo} className="press border border-bg/40 px-2.5 py-1 text-xs uppercase hover:bg-bg hover:text-text">
           Undo
         </button>
       </div>

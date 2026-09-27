@@ -17,7 +17,7 @@ export const IconButton = forwardRef<
       aria-label={label}
       title={label}
       className={cx(
-        "hover-breathe touch-target relative grid shrink-0 place-items-center rounded-full text-text hover:bg-surface-2",
+        "press touch-target relative grid shrink-0 place-items-center text-text hover:bg-text hover:text-bg",
         size === "md" ? "size-9" : "size-8",
         className,
       )}

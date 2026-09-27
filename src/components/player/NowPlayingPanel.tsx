@@ -1,7 +1,8 @@
 "use client";
 
-import { LoaderCircle, RefreshCw, X } from "lucide-react";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { memo, useEffect, useId, useRef, useState } from "react";
+import { buttonStyles } from "@/components/ui/Button";
 import { retryScanning } from "@/hooks/useAdScanner";
 import { advertiser } from "@/lib/ads/label";
 import { WINDOW_SECONDS } from "@/lib/analysis";
@@ -42,11 +43,11 @@ export function NowPlayingPanel() {
   return (
     <section
       aria-label="Transcript and ads"
-      className="animate-toast-in mx-auto mb-2 flex max-h-[min(62dvh,36rem)] w-full max-w-[69rem] flex-col overflow-hidden rounded-3xl bg-surface shadow-float"
+      className="animate-toast-in mx-auto mb-2 flex max-h-[min(62dvh,36rem)] w-full max-w-[60rem] flex-col overflow-hidden border border-text bg-bg font-grotesk shadow-float"
     >
       {/* Phones: tabs and close on one row, scan status under them. Wider: all on one row. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-4 pb-2 pt-4 sm:flex-nowrap sm:px-5">
-        <div role="tablist" aria-label="Panel" onKeyDown={onTabKey} className="flex shrink-0 gap-1 rounded-full bg-surface-2 p-1">
+        <div role="tablist" aria-label="Panel" onKeyDown={onTabKey} className="flex shrink-0 gap-1">
           <TabButton id={tabId("transcript")} controls={panelId} active={tab === "transcript"} onClick={() => setTab("transcript")}>
             Transcript
           </TabButton>
@@ -63,10 +64,10 @@ export function NowPlayingPanel() {
         </div>
         <button
           onClick={() => setPanelOpen(false)}
-          className="hover-breathe ml-auto grid size-9 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2 hover:text-text sm:ml-0"
+          className={`${buttonStyles({ variant: "word", size: "sm" })} ml-auto sm:ml-0`}
           aria-label="Close panel"
         >
-          <X className="size-4" />
+          Close
         </button>
       </div>
       <div id={panelId} role="tabpanel" aria-labelledby={tabId(tab)} className="flex min-h-0 flex-1 flex-col">
@@ -97,9 +98,7 @@ function TabButton({
       aria-controls={controls}
       tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`touch-target relative flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium transition-colors ${
-        active ? "bg-accent text-accent-text" : "text-text hover:bg-surface"
-      }`}
+      className={`touch-target relative ${buttonStyles({ variant: "word", size: "sm" })}`}
     >
       {children}
     </button>
@@ -118,7 +117,7 @@ function ScanStatus() {
         <span className="truncate" title={error}>
           Ad detection paused: {error}
         </span>
-        <button onClick={retryScanning} className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 hover:bg-surface-2">
+        <button onClick={retryScanning} className="flex shrink-0 items-center gap-1 px-2 py-0.5 uppercase hover:line-through">
           <RefreshCw className="size-3" /> Retry
         </button>
       </div>
@@ -199,7 +198,7 @@ function Transcript() {
       {!follow && (
         <button
           onClick={() => setFollow(true)}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-3.5 py-1.5 text-xs font-medium text-accent-text"
+          className={`absolute bottom-3 left-1/2 -translate-x-1/2 ${buttonStyles({ size: "sm" })}`}
         >
           Jump to now
         </button>
@@ -229,11 +228,11 @@ const TranscriptLine = memo(function TranscriptLine({
       data-index={index}
       aria-current={active || undefined}
       onClick={() => onSeek(segment.start)}
-      className={`hover-fill hover-soft relative flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-body leading-relaxed ${
+      className={`hover-fill hover-soft relative flex w-full gap-4 px-3 py-1.5 text-left text-body leading-relaxed ${
         ad ? "bg-ad-soft" : active ? "bg-surface-2" : ""
       } ${active ? "font-medium text-text" : ad || past ? "text-muted" : "text-text"} ${
         // The current line always carries an ink bar, even inside an ad, so you can see where you are.
-        active ? "before:absolute before:inset-y-2 before:left-1 before:w-[3px] before:rounded-full before:bg-text" : ""
+        active ? "before:absolute before:inset-y-2 before:left-1 before:w-[3px] before:bg-text" : ""
       }`}
     >
       <span className={`w-14 shrink-0 pt-0.5 font-mono text-xs ${ad ? "text-ad-text" : active ? "text-text" : "text-faint"}`}>
@@ -275,7 +274,7 @@ function AdList() {
             <li key={`${ad.start}-${ad.end}`}>
               <button
                 onClick={() => seek(ad.start)}
-                className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden rounded-2xl bg-ad-soft px-4 py-3.5 text-left"
+                className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden border-l-2 border-ad bg-ad-soft px-4 py-3.5 text-left"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="truncate font-serif text-xl">{advertiser(ad)}</span>

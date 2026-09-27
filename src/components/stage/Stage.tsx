@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { NowPlayingPanel } from "@/components/player/NowPlayingPanel";
 import { SkipToast, type SkipNotice } from "@/components/player/SkipToast";
+import { Waveform } from "@/components/player/Waveform";
 import { formatClock } from "@/lib/text";
 import type { TranscriptSegment } from "@/lib/types";
 import { useAnalysis } from "@/store/analysis";
@@ -83,6 +84,7 @@ export function Stage({
 
       <TopWords close={close} closeButton={closeButton} />
       <SpokenLines />
+      <StageWaveform />
 
       <div className="absolute inset-x-0 bottom-0 z-0 flex flex-col gap-3 p-2 pl-9 sm:flex-row sm:items-end sm:justify-between sm:p-3 sm:pl-12">
         <TitleBar />
@@ -147,6 +149,31 @@ function TopWords({ close, closeButton }: { close: () => void; closeButton: Reac
   );
 }
 
+/** The episode's waveform, large, across the lower part of the window: it's also the seek bar. */
+function StageWaveform() {
+  const seek = usePlayer((s) => s.seek);
+  const currentTime = usePlayback((s) => s.currentTime);
+  const duration = usePlayback((s) => s.duration);
+  const ads = useAnalysis((s) => s.ads);
+  const windows = useAnalysis((s) => s.windows);
+  const envelopes = useAnalysis((s) => s.envelopes);
+  const segments = useAnalysis((s) => s.segments);
+  return (
+    <div className="absolute inset-x-10 bottom-28 z-0 font-sans sm:inset-x-24 sm:bottom-24">
+      <Waveform
+        size="lg"
+        currentTime={currentTime}
+        duration={duration}
+        ads={ads}
+        windows={windows}
+        envelopes={envelopes}
+        segments={segments}
+        onSeek={seek}
+      />
+    </div>
+  );
+}
+
 /** Index of the last line starting at or before `time`, or -1. */
 function lineAt(segments: TranscriptSegment[], time: number): number {
   let low = 0;
@@ -174,7 +201,7 @@ function SpokenLines() {
   const previous = segments[index - 1];
 
   return (
-    <div className="absolute inset-x-0 top-1/2 z-0 -translate-y-1/2 px-10 sm:px-24" aria-live="off">
+    <div className="absolute inset-x-0 top-[40%] z-0 -translate-y-1/2 px-10 sm:px-24" aria-live="off">
       {current ? (
         <>
           {previous && (

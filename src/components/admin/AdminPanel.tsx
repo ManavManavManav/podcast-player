@@ -54,11 +54,11 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
       </p>
 
       {error && (
-        <p role="alert" className="flex items-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+        <p role="alert" className="flex items-center gap-2 border-l-2 border-danger bg-danger/10 px-3 py-2 text-sm text-danger">
           <CircleAlert className="size-4 shrink-0" /> {error}
         </p>
       )}
-      {notice && <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent">{notice}</p>}
+      {notice && <p className="border-l-2 border-text bg-surface-2 px-3 py-2 text-sm">{notice}</p>}
 
       <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-2">
         {users.map((user) => {
@@ -147,11 +147,11 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
 
 function Status({ user }: { user: AdminUser }) {
   const [label, className] = user.role === "admin"
-    ? ["Admin", "bg-accent-soft text-accent"]
+    ? ["Admin", "bg-text text-bg"]
     : !user.approved
       ? ["Waiting", "bg-ad-soft text-ad-text"]
       : user.banned
         ? ["Disabled", "bg-danger/10 text-danger"]
         : ["Active", "bg-surface-2 text-muted"];
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-micro font-medium ${className}`}>{label}</span>;
+  return <span className={`shrink-0 px-1.5 py-0.5 text-micro uppercase ${className}`}>{label}</span>;
 }

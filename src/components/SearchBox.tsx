@@ -53,8 +53,8 @@ export function SearchBox({ size = "md", autoFocus = false }: { size?: "md" | "l
         aria-label="Search podcasts"
         autoFocus={autoFocus}
         enterKeyHint="search"
-        className={`w-full rounded-full bg-surface text-text placeholder:text-faint transition focus:outline-none focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-search-cancel-button]:hidden ${
-          large ? "h-14 pl-13 pr-12 text-base" : "h-[42px] pl-10 pr-9 text-sm"
+        className={`w-full border border-text/20 bg-bg text-text placeholder:text-faint transition-colors hover:border-text/50 focus:border-text focus:outline-none [&::-webkit-search-cancel-button]:hidden ${
+          large ? "h-14 pl-13 pr-12 text-base" : "h-10 pl-10 pr-9 text-sm"
         }`}
       />
       {query && (
@@ -64,7 +64,7 @@ export function SearchBox({ size = "md", autoFocus = false }: { size?: "md" | "l
             setQuery("");
             input.current?.focus();
           }}
-          className={`touch-target absolute top-1/2 -translate-y-1/2 rounded-full p-1 text-faint hover:text-text ${large ? "right-4" : "right-2.5"}`}
+          className={`touch-target absolute top-1/2 -translate-y-1/2 p-1 text-faint hover:bg-text hover:text-bg ${large ? "right-4" : "right-2.5"}`}
           aria-label="Clear search"
         >
           <X className="size-4" />

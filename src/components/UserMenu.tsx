@@ -48,7 +48,7 @@ export function UserMenu({
         onClick={() => setOpen((o) => !o)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="hover-breathe grid size-10 place-items-center overflow-hidden rounded-full bg-accent text-sm font-medium text-accent-text"
+        className="press grid size-10 place-items-center overflow-hidden bg-text text-sm uppercase text-bg hover:line-through"
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -60,37 +60,37 @@ export function UserMenu({
       {open && (
         <div
           role="menu"
-          className="animate-toast-in absolute right-0 top-full z-50 mt-2 w-60 rounded-xl border border-border bg-surface p-1 shadow-float"
+          className="animate-toast-in absolute right-0 top-full z-50 mt-2 w-60 border border-text bg-bg p-1 shadow-float"
         >
           <div className="px-3 py-2">
             <p className="truncate text-sm font-medium">{name}</p>
             <p className="truncate text-xs text-muted">{email}</p>
           </div>
-          <div className="my-1 h-px bg-border" />
+          <div className="my-1 h-px bg-text/15" />
           <Link
             href="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}
-            className="hover-fill flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm"
+            className="flex items-center gap-2.5 px-3 py-2 text-sm uppercase hover:bg-text hover:text-bg focus-visible:bg-text focus-visible:text-bg focus-visible:outline-none"
           >
-            <Settings className="size-4 text-muted" /> Settings
+            <Settings className="size-4" aria-hidden="true" /> Settings
           </Link>
           {isAdmin && (
             <Link
               href="/admin"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="hover-fill flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm"
+              className="flex items-center gap-2.5 px-3 py-2 text-sm uppercase hover:bg-text hover:text-bg focus-visible:bg-text focus-visible:text-bg focus-visible:outline-none"
             >
-              <Users className="size-4 text-muted" /> Users
+              <Users className="size-4" aria-hidden="true" /> Users
             </Link>
           )}
           <button
             role="menuitem"
             onClick={signOut}
-            className="hover-fill flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm uppercase hover:bg-text hover:text-bg focus-visible:bg-text focus-visible:text-bg focus-visible:outline-none"
           >
-            <LogOut className="size-4 text-muted" /> Sign out
+            <LogOut className="size-4" aria-hidden="true" /> Sign out
           </button>
         </div>
       )}

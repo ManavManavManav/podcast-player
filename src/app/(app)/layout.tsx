@@ -20,7 +20,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:rounded-lg focus:bg-surface focus:px-3 focus:py-2 focus:shadow-card"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-[60] focus:bg-text focus:px-3 focus:py-2 focus:uppercase focus:text-bg"
       >
         Skip to content
       </a>

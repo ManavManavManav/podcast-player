@@ -43,7 +43,7 @@ export default async function PodcastPage({ params }: Props) {
           {podcast.categories.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {podcast.categories.slice(0, 5).map((c) => (
-                <li key={c} className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
+                <li key={c} className="border border-text/20 px-2 py-1 text-xs uppercase text-muted">
                   {c}
                 </li>
               ))}

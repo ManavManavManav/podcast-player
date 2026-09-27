@@ -23,7 +23,7 @@ export function ExpandableText({ text, lines = 3, className = "" }: { text: stri
         {text}
       </p>
       {(overflows || expanded) && (
-        <button onClick={() => setExpanded((e) => !e)} className="mt-1 text-sm font-medium text-text hover:underline">
+        <button onClick={() => setExpanded((e) => !e)} className="mt-1 text-xs uppercase text-text hover:line-through">
           {expanded ? "Less" : "More"}
         </button>
       )}

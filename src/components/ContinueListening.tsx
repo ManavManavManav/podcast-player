@@ -1,15 +1,13 @@
 "use client";
 
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { Artwork } from "@/components/Artwork";
+import { buttonStyles } from "@/components/ui/Button";
 import { playBurst } from "@/components/player/PlayBurst";
 import { formatDuration } from "@/lib/text";
 import type { Episode } from "@/lib/types";
-import { useEpisodeProgress, usePlayer } from "@/store/player";
-
-const pill =
-  "hover-breathe flex h-12 items-center gap-2.5 rounded-full px-6 text-body font-medium [--hover-scale:1.03]";
+import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
 
 /** The hero's buttons, plus the listener's running total of time saved. */
 export function HeroActions() {
@@ -20,11 +18,11 @@ export function HeroActions() {
   return (
     <>
       <div className="mt-9 flex flex-wrap justify-center gap-3">
-        <Link href="/search" className={`${pill} bg-accent text-accent-text`}>
+        <Link href="/search" className={buttonStyles({ size: "lg" })}>
           Find a show <ArrowRight className="size-4" aria-hidden="true" />
         </Link>
         {latest && (
-          <button onClick={() => play(latest)} className={`${pill} max-w-full border border-accent`}>
+          <button onClick={() => play(latest)} className={`${buttonStyles({ variant: "outline", size: "lg" })} max-w-full`}>
             <span className="truncate">Resume {latest.title}</span>
             <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
           </button>
@@ -62,6 +60,8 @@ export function ContinueListening() {
 function RecentCard({ episode }: { episode: Episode }) {
   const play = usePlayer((s) => s.play);
   const isCurrent = usePlayer((s) => s.episode?.id === episode.id);
+  const playing = usePlayback((s) => s.playing) && isCurrent;
+  const toggle = usePlayer((s) => s.toggle);
   const progress = useEpisodeProgress(episode);
   return (
     <li className="flex items-center gap-4 rounded-card bg-surface p-4 sm:gap-5 sm:p-5">
@@ -71,8 +71,8 @@ function RecentCard({ episode }: { episode: Episode }) {
           {episode.podcastTitle}
         </Link>
         <p className="line-clamp-2 font-serif text-xl leading-tight sm:text-[23px]">{episode.title}</p>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(progress * 100)}%` }} />
+        <div className="mt-2 h-0.5 overflow-hidden bg-text/15">
+          <div className="h-full bg-text" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
         {episode.duration > 0 && (
           <span className="font-mono text-xs text-faint">{formatDuration(episode.duration * (1 - progress))} left</span>
@@ -80,13 +80,14 @@ function RecentCard({ episode }: { episode: Episode }) {
       </div>
       <button
         onClick={(e) => {
-          if (!isCurrent) playBurst(e.currentTarget);
+          if (isCurrent) return toggle();
+          playBurst(e.currentTarget);
           play(episode);
         }}
-        aria-label={`Play ${episode.title}`}
-        className="hover-breathe grid size-12 shrink-0 place-items-center rounded-full bg-accent text-accent-text [--hover-scale:1.08]"
+        aria-label={`${playing ? "Pause" : "Play"} ${episode.title}`}
+        className={`${buttonStyles({ size: "md" })} w-[6rem]`}
       >
-        <Play className="ml-0.5 size-4 fill-current" />
+        {playing ? "Pause" : isCurrent ? "Play" : "Resume"}
       </button>
     </li>
   );

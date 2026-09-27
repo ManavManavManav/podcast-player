@@ -40,7 +40,7 @@ export const PasswordInput = forwardRef<
           onClick={() => setShown((s) => !s)}
           aria-label={shown ? "Hide password" : "Show password"}
           aria-pressed={shown}
-          className="touch-target absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full text-faint hover:bg-surface-2 hover:text-text"
+          className="touch-target absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-faint hover:bg-text hover:text-bg"
         >
           {shown ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
         </button>

@@ -2,7 +2,7 @@ import { forwardRef } from "react";
 import { cx } from "@/components/ui/cx";
 
 export const inputStyles =
-  "h-11 w-full rounded-full bg-bg px-4 text-sm text-text placeholder:text-faint transition focus:outline-none focus-visible:outline-2 focus-visible:outline-accent";
+  "h-11 w-full border border-text/20 bg-bg px-3 text-sm text-text placeholder:text-faint transition-colors hover:border-text/50 focus:border-text focus:outline-none";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
