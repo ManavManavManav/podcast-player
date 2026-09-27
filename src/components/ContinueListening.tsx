@@ -9,7 +9,7 @@ import type { Episode } from "@/lib/types";
 import { useEpisodeProgress, usePlayer } from "@/store/player";
 
 const pill =
-  "hover-breathe flex h-12 items-center gap-2.5 rounded-full px-6 text-[15px] font-medium [--hover-scale:1.03]";
+  "hover-breathe flex h-12 items-center gap-2.5 rounded-full px-6 text-body font-medium [--hover-scale:1.03]";
 
 /** The hero's buttons, plus the listener's running total of time saved. */
 export function HeroActions() {
@@ -31,7 +31,7 @@ export function HeroActions() {
         )}
       </div>
       {stats.adsSkipped > 0 && (
-        <p className="mt-6 font-mono text-[13px] text-faint">
+        <p className="mt-6 font-mono text-meta text-faint">
           {stats.adsSkipped} {stats.adsSkipped === 1 ? "ad" : "ads"} skipped · {formatDuration(stats.secondsSaved)} saved
         </p>
       )}
@@ -47,8 +47,8 @@ export function ContinueListening() {
   return (
     <section>
       <div className="mb-6 flex items-baseline gap-3">
-        <h2 className="font-serif text-[34px] leading-tight tracking-[-0.01em]">Continue listening</h2>
-        <span className="font-mono text-[13px] text-faint">{recent.length}</span>
+        <h2 className="font-serif text-heading leading-tight tracking-heading">Continue listening</h2>
+        <span className="font-mono text-meta text-faint">{recent.length}</span>
       </div>
       <ul className="grid gap-5 md:grid-cols-2">
         {recent.slice(0, 4).map((episode) => (
@@ -64,10 +64,10 @@ function RecentCard({ episode }: { episode: Episode }) {
   const isCurrent = usePlayer((s) => s.episode?.id === episode.id);
   const progress = useEpisodeProgress(episode);
   return (
-    <li className="flex items-center gap-4 rounded-[22px] bg-surface p-4 sm:gap-5 sm:p-5">
-      <Artwork src={episode.image} alt="" className="size-16 shrink-0 rounded-[14px] sm:size-[92px]" />
+    <li className="flex items-center gap-4 rounded-card bg-surface p-4 sm:gap-5 sm:p-5">
+      <Artwork src={episode.image} alt="" className="size-16 shrink-0 rounded-art sm:size-[92px]" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link href={`/podcast/${episode.podcastId}`} className="truncate text-[13px] text-faint hover:text-text">
+        <Link href={`/podcast/${episode.podcastId}`} className="truncate text-meta text-faint hover:text-text">
           {episode.podcastTitle}
         </Link>
         <p className="line-clamp-2 font-serif text-xl leading-tight sm:text-[23px]">{episode.title}</p>

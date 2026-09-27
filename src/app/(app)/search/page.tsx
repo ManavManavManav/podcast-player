@@ -17,7 +17,7 @@ export default async function SearchPage({ searchParams }: Props) {
   if (!q) {
     return (
       <section className="mx-auto flex max-w-2xl flex-col items-center pt-10 text-center sm:pt-16">
-        <h1 className="font-serif text-5xl tracking-[-0.02em] sm:text-6xl">Find a show</h1>
+        <h1 className="font-serif text-5xl tracking-display sm:text-6xl">Find a show</h1>
         <p className="mt-4 text-muted">Search millions of podcasts by name, host or topic.</p>
         <div className="mt-8 w-full">
           <Suspense>
@@ -30,7 +30,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="mb-8 font-serif text-4xl tracking-[-0.01em] sm:text-5xl">
+      <h1 className="mb-8 font-serif text-4xl tracking-heading sm:text-5xl">
         <span className="text-muted">Results for</span> “{q}”
       </h1>
       <Suspense key={q} fallback={<PodcastGridSkeleton />}>

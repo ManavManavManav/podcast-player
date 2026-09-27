@@ -33,11 +33,11 @@ export default async function PodcastPage({ params }: Props) {
           src={podcast.image}
           alt=""
           priority
-          className="size-40 shrink-0 rounded-[22px] sm:size-52"
+          className="size-40 shrink-0 rounded-card sm:size-52"
         />
         <div className="min-w-0 space-y-3">
           <div>
-            <h1 className="font-serif text-4xl leading-[1.05] tracking-[-0.02em] text-balance sm:text-[56px]">{podcast.title}</h1>
+            <h1 className="font-serif text-4xl leading-[1.05] tracking-display text-balance sm:text-show">{podcast.title}</h1>
             {podcast.author && <p className="mt-2 text-muted">{podcast.author}</p>}
           </div>
           {podcast.categories.length > 0 && (
@@ -63,12 +63,12 @@ export default async function PodcastPage({ params }: Props) {
       </header>
 
       {podcast.description && (
-        <ExpandableText text={podcast.description} className="max-w-3xl text-[15px] leading-relaxed text-muted" />
+        <ExpandableText text={podcast.description} className="max-w-3xl text-body leading-relaxed text-muted" />
       )}
 
       <section>
-        <h2 className="mb-6 flex items-baseline gap-3 font-serif text-[34px] leading-tight tracking-[-0.01em]">
-          Episodes <span className="font-mono text-[13px] text-faint">{episodes.length}</span>
+        <h2 className="mb-6 flex items-baseline gap-3 font-serif text-heading leading-tight tracking-heading">
+          Episodes <span className="font-mono text-meta text-faint">{episodes.length}</span>
         </h2>
         {episodes.length ? (
           <EpisodeList episodes={episodes} />

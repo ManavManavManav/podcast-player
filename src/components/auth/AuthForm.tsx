@@ -55,7 +55,7 @@ export function AuthForm({
 
   return (
     <div className="rounded-3xl bg-surface p-6 sm:p-8">
-      <h1 className="font-serif text-3xl tracking-[-0.01em]">{signup ? "Create your account" : "Sign in"}</h1>
+      <h1 className="font-serif text-3xl tracking-heading">{signup ? "Create your account" : "Sign in"}</h1>
       <p className="mt-2 text-sm text-muted">
         {signup
           ? askForSetupCode
@@ -137,7 +137,7 @@ export function AuthForm({
         <button
           type="submit"
           disabled={pending}
-          className="hover-breathe mt-2 flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-[15px] font-medium text-accent-text disabled:opacity-60 [--hover-scale:1.02]"
+          className="hover-breathe mt-2 flex h-12 items-center justify-center gap-2 rounded-full bg-accent text-body font-medium text-accent-text disabled:opacity-60 [--hover-scale:1.02]"
         >
           {pending && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}
           {signup ? "Create account" : "Sign in"}

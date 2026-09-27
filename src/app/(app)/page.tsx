@@ -7,7 +7,7 @@ export default function HomePage() {
   return (
     <div className="space-y-16 sm:space-y-20">
       <section className="flex flex-col items-center pt-8 text-center sm:pt-14">
-        <h1 className="font-serif text-[46px] leading-[1.02] tracking-[-0.02em] text-balance sm:text-[76px]">
+        <h1 className="font-serif text-hero leading-[1.02] tracking-display text-balance sm:text-hero-lg">
           Podcasts,
           <br />
           minus the ads.
@@ -21,7 +21,7 @@ export default function HomePage() {
       <ContinueListening />
 
       <section>
-        <h2 className="mb-6 font-serif text-[34px] leading-tight tracking-[-0.01em]">Trending now</h2>
+        <h2 className="mb-6 font-serif text-heading leading-tight tracking-heading">Trending now</h2>
         <Suspense fallback={<PodcastGridSkeleton />}>
           <Trending />
         </Suspense>

@@ -15,7 +15,7 @@ export default async function AdminPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <div>
-        <h1 className="font-serif text-5xl tracking-[-0.02em]">Users</h1>
+        <h1 className="font-serif text-5xl tracking-display">Users</h1>
         <p className="mt-3 text-muted">
           New accounts can&apos;t listen until you approve them. Usage is this month&apos;s paid API work.
         </p>

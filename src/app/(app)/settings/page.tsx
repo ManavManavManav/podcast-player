@@ -11,7 +11,7 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-12">
-      <h1 className="font-serif text-5xl tracking-[-0.02em]">Settings</h1>
+      <h1 className="font-serif text-5xl tracking-display">Settings</h1>
       <AccountSettings name={user.name} email={user.email} />
     </div>
   );

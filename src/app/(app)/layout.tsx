@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-40 bg-bg/85 backdrop-blur-xl">
         <div className="mx-auto flex h-[76px] max-w-6xl items-center gap-3 px-4 sm:gap-8 sm:px-6">
           <Logo />
-          <nav className="hidden items-center gap-7 text-[15px] md:flex">
+          <nav className="hidden items-center gap-7 text-body md:flex">
             <Link href="/" className="font-medium hover:text-muted">
               Discover
             </Link>

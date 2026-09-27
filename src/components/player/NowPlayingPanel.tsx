@@ -181,7 +181,7 @@ const TranscriptLine = memo(function TranscriptLine({
     <button
       data-index={index}
       onClick={() => onSeek(segment.start)}
-      className={`hover-fill flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-[15px] leading-relaxed ${
+      className={`hover-fill flex w-full gap-4 rounded-xl px-3 py-1.5 text-left text-body leading-relaxed ${
         ad ? "bg-ad-soft text-muted" : active ? "bg-surface-2 font-medium text-text" : past ? "text-muted" : "text-text"
       }`}
     >

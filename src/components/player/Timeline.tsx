@@ -57,7 +57,7 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
     .map(([w]) => Number(w));
 
   return (
-    <div className="flex items-center gap-3 font-mono text-[11px] text-muted">
+    <div className="flex items-center gap-3 font-mono text-micro text-muted">
       <span className="w-14 text-right">{formatClock(shown)}</span>
       <div
         ref={track}
@@ -125,7 +125,7 @@ export function Timeline({ currentTime, duration, ads, windows, onSeek }: Props)
         />
         {hover !== null && drag === null && (
           <div
-            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-text px-1.5 py-0.5 text-[11px] text-bg"
+            className="pointer-events-none absolute -top-7 -translate-x-1/2 rounded-md bg-text px-1.5 py-0.5 text-micro text-bg"
             style={{ left: pct(hover) }}
           >
             {formatClock(hover)}

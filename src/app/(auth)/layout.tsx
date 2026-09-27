@@ -6,7 +6,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <LogoMark className="size-11" />
-          <p className="font-serif text-3xl tracking-[-0.01em]">Podcasts, minus the ads.</p>
+          <p className="font-serif text-3xl tracking-heading">Podcasts, minus the ads.</p>
         </div>
         {children}
       </div>

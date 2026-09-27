@@ -47,7 +47,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
 
   return (
     <section className="space-y-4">
-      <p className="font-mono text-[13px] text-faint">
+      <p className="font-mono text-meta text-faint">
         {users.length} {users.length === 1 ? "account" : "accounts"}
         {pending > 0 && <span className="font-medium text-ad-text"> · {pending} waiting for approval</span>}
       </p>
@@ -163,5 +163,5 @@ function Status({ user }: { user: AdminUser }) {
       : user.banned
         ? ["Disabled", "bg-danger/10 text-danger"]
         : ["Active", "bg-surface-2 text-muted"];
-  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;
+  return <span className={`shrink-0 rounded-full px-2 py-0.5 text-micro font-medium ${className}`}>{label}</span>;
 }

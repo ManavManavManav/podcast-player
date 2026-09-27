@@ -386,7 +386,7 @@ function PlayerBar() {
         </Link>
         <div className="min-w-0 flex-1">
           <p className="truncate font-serif text-lg leading-tight">{episode.title}</p>
-          <p className="truncate text-[13px] text-muted">
+          <p className="truncate text-meta text-muted">
             {error ? <span className="text-danger">{error}</span> : episode.podcastTitle}
           </p>
         </div>
@@ -458,7 +458,7 @@ function SecondaryControls() {
       >
         {autoSkip ? <ShieldCheck className="size-4 text-ad" /> : <ShieldOff className="size-4" />}
         <span>{autoSkip ? "Skipping ads" : "Ads on"}</span>
-        {adCount > 0 && <span className="font-mono text-[11px] text-muted">{adCount}</span>}
+        {adCount > 0 && <span className="font-mono text-micro text-muted">{adCount}</span>}
       </button>
 
       <Popover label="Playback speed" trigger={<span className="font-mono">{rate}×</span>}>
