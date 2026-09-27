@@ -12,6 +12,22 @@ Audit of branch `vercel-api` @ `5be255f`, 2026-09-26. No code was changed; this 
 - **Your running `next dev` (:3001)** picks up these changes as files change. On its next restart it will: send the new security headers; run the schema migration (verified on a copy of your database: all data kept, the empty `user_settings` table dropped, `rateLimit` added); and log JSON lines.
 - **GitHub private vulnerability reporting is off** for the repo; `SECURITY.md` works either way.
 
+## Decisions (answered 2026-09-26)
+
+| Q | Answer | Consequence |
+|---|---|---|
+| Q1 hosting | Vercel only; self-hosting is for testing | #42 won't be done (`next dev`/`next start` suffice for testing). Rate limiting relies on Vercel's `X-Forwarded-For` (fine). |
+| Q2 audience | Friends and family | No abuse controls beyond approval. |
+| Q3 admin bootstrap | One-time setup code | #7: signing up with the admin email needs `PODBLOCK_SETUP_CODE` (or a provider-verified email via GitHub/Google). |
+| Q4 quotas | No limits for friends and family | #13 won't be done; usage stays visible on the Users page. |
+| Q5 retention | Keep transcripts and verdicts for a month | #40: daily cleanup of analysis older than 30 days (Vercel Cron). |
+| Q6 error tracking | None for now | #33 won't be done; the structured logs and `request.error` (#31, #33a) cover it. |
+| Q8 ffmpeg | Unclear; asked again in plainer terms | #11 still open. |
+| Q9 episode context | Unclear; asked again in plainer terms | #12 still open. |
+| Q10 repo | Clean up; keep only the Vercel/API line of work (`vercel-api`) | #44. |
+| Q11 license | Any open-source license | #45b: MIT. |
+| Q14 MP3 seeking | My call | The hybrid: fast seeking only for constant-bitrate MP3 and M4A. |
+
 ## 0. What I ran
 
 | Check | Result |
@@ -230,8 +246,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
    - *Blocked:* Q8 (OK to switch to a maintained ffmpeg build such as `ffmpeg-static`?). The audio characterization tests from #4 are ready to validate a swap.
 12. [blocked] **Trusted episode context (S-6) (Q9).** *Verify:* a route test where client-supplied titles are ignored or cannot affect another user's cached verdict.
    - *Blocked:* Q9 (server-derived episode context vs. context-hashed verdict cache).
-13. [blocked] **Per-user quotas (S-8) (Q4).** *Verify:* an analyzer test that returns 429 once the cap is reached; the admin page shows remaining quota.
-   - *Blocked:* Q4 (quota values, hard block vs. notify, admin exemption).
+13. [won't do] **Per-user quotas (S-8) (Q4).** *Verify:* an analyzer test that returns 429 once the cap is reached; the admin page shows remaining quota.
+   - *Decided:* Won't do (Q4: no limits for friends and family).
 
 ### Phase 2: Correctness
 14. [x] **Build must not touch the DB (C-9).** Call `headers()` before `getAuth()`. *Verify:* `next build` in a clean copy leaves no `.data/`, and there is no Better Auth log during prerender.
@@ -278,8 +294,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
    - *Done:* New `src/lib/server/log.ts`: JSON lines (`time, level, event, requestId, …fields`) via `console.log` (and `console.error` for warn and above); level set by `PODBLOCK_LOG_LEVEL`, default info, silent under tests; `Error`s are serialised with their cause chain; **values of configured secrets are redacted** even inside messages; the request id comes from `AsyncLocalStorage` (`x-request-id` → `x-vercel-id` → random UUID). Events: `analysis.transcribed` (extractMs, transcribeMs, bytes, audioSeconds, segments), `analysis.detected` (detector, detectMs, ads, tokens), `analysis.end_of_audio`, `analysis.failed` / `analysis.stopped`, `provider.retry` / `provider.retry_skipped`, `podcastindex.failed`, `admin.action` (an audit trail with admin, action, target and outcome; never the password), and Better Auth's own messages via its `logger` option. Tests first (the logger's own 8, plus analyzer, route, admin-audit and retry integration; 5 failed before wiring). **Verified live:** `next start` against the fake providers wrote the expected lines, with a distinct request id per window request and real stage timings. `PODBLOCK_LOG_LEVEL` gets documented in #35.
 32. [x] **`/api/healthz` + `/api/readyz` (O-2).** *Verify:* `curl` without a cookie returns 200/`{ok:true}`; with the DB unreachable, readyz returns 503.
    - *Done:* `/api/healthz` returns `{ok:true}` (liveness, no details, `no-store`). `/api/readyz` runs `SELECT 1` with a 3 s timeout, returning 200 `{ok:true, database:"ok"}` or 503 `{ok:false, database:"unavailable"}`; the reason is logged (`readyz.database`), never returned. Both are excluded from the sign-in proxy matcher. Tests first (proxy matcher, healthz, readyz ok/fail/timeout). **Verified live** with `curl` against `next start` and no cookie: healthz 200, readyz 200, while `/api/health` and `/api/analyze` stay 401. With `DATABASE_URL` pointing at a dead address: healthz still 200, readyz **503**, and the cause is in the log. The old authed `/api/health` stays for the setup banner.
-33. [blocked] **Error tracking (O-3) (Q6).** *Verify:* a thrown test error appears in the chosen tool from both a server route and a client component.
-   - *Blocked:* Q6 (error-tracking tool: Vercel logs only, Sentry, Axiom or OpenTelemetry). The structured logs from #31 are the fallback meanwhile.
+33. [won't do] **Error tracking (O-3) (Q6).** *Verify:* a thrown test error appears in the chosen tool from both a server route and a client component.
+   - *Decided:* Won't do (Q6: no error tracking for now).
 
 33a. [x] **Log unhandled server errors (O-3, vendor-neutral part; split from #33).** Export `onRequestError` from `instrumentation.ts` so errors thrown while rendering pages or in routes reach the structured log with their digest, path and route, matching the "Reference" shown on the error page. *Verify:* unit test of the hook, plus a live run where the digest shown in the browser appears in the server log.
    - *Done:* `instrumentation.ts` exports `onRequestError`, which (on the Node runtime only) logs `request.error` with the digest, method, path, route, route type and error; request headers (cookies) are not logged. Test first (2). **Verified live:** with broken Podcast Index keys, the browser's error page showed `Reference: 1192167249`, and the server log had `request.error` with that digest, the `PodcastIndexError` and the route `/podcast/[id]`. It appears twice because `generateMetadata` and the page both fail. #33 proper (a vendor) stays blocked on Q6.
@@ -305,8 +321,8 @@ Each item is one commit. Security fixes come first, after CI so every later comm
 ### Phase 7: Build, packaging and repo hygiene
 41. [x] **Dependency automation + Node pinning (B-2).** *Verify:* the Dependabot config validates; CI uses `.nvmrc`.
    - *Done:* Added `.github/dependabot.yml`: weekly npm updates with minor and patch grouped into one PR, weekly GitHub Actions updates, and `@playwright/test` minor/major bumps excluded because its version must match the browser CI installs. `engines.node` goes `>=20.9` → **`>=22`** (Node 20 reached end-of-life in April 2026). The doctor and README match. I deliberately didn't use an exact `24.x` pin, because Vercel chooses its Node major from `engines` and `>=22` resolves to 24 as today. **Verified the floor rather than assuming it:** the full unit suite passes on Node 22.23.3 (317 passed), and CI's check job now runs a matrix of 22 and 24 (coverage uploaded from 24). The Dependabot config was only YAML-validated locally; GitHub validates it on push. No `packageManager` field: it would force corepack behaviour on contributors for no gain.
-42. [blocked] **Self-host packaging (D-1) (Q1).** `output: "standalone"`, a Dockerfile and a compose example. *Verify:* `docker build` and `docker run`, then the E2E suite passes against the container.
-   - *Blocked:* Q1 (Vercel only, self-hosted, or both). The E2E suite from #30 is ready to validate a container.
+42. [won't do] **Self-host packaging (D-1) (Q1).** `output: "standalone"`, a Dockerfile and a compose example. *Verify:* `docker build` and `docker run`, then the E2E suite passes against the container.
+   - *Decided:* Won't do (Q1: Vercel only; self-hosting is only for testing).
 43. [blocked] **Environment separation + backups (D-2, D-3).** *Verify:* preview deploys point at a non-prod DB (visible via readyz metadata); the backup/restore runbook is exercised once.
    - *Blocked:* Q1. Also needs your Turso/Vercel accounts for per-environment databases. The backup and restore *procedure* is written up in the runbook (#45a).
 44. [blocked] **Repo cleanup (B-3) (Q10).** *Verify:* `git status` is clean, and the branch list matches the agreed set.
