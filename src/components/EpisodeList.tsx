@@ -9,7 +9,7 @@ import { useEpisodeProgress, usePlayback, usePlayer } from "@/store/player";
 
 export function EpisodeList({ episodes }: { episodes: Episode[] }) {
   return (
-    <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-4 sm:px-6">
+    <ul className="divide-y divide-border overflow-hidden bg-surface px-4 sm:px-6">
       {episodes.map((episode) => (
         <EpisodeRow key={episode.id} episode={episode} list={episodes} />
       ))}
@@ -46,7 +46,7 @@ function EpisodeRow({ episode, list }: { episode: Episode; list: Episode[] }) {
   return (
     // Inset a little on each side (and pulled back out by the same amount), so the play
     // button's hover scale isn't clipped by the row, which clips its sheen.
-    <li className="hover-wave group relative -mx-2 flex gap-4 overflow-hidden px-2 py-5">
+    <li className="group relative -mx-2 flex gap-4 overflow-hidden px-2 py-5">
       <button
         ref={playButton}
         onClick={onClick}

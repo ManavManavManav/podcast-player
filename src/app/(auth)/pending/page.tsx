@@ -15,7 +15,7 @@ export default async function PendingPage() {
   if (user.approved) redirect("/");
 
   return (
-    <div className="rounded-3xl bg-surface p-6 text-center sm:p-8">
+    <div className="bg-surface p-6 text-center sm:p-8">
       <h1 className="font-serif text-3xl">Waiting for approval</h1>
       <p className="mt-2 text-sm text-muted">
         Your account ({user.email}) has been created. The server&apos;s owner needs to approve it before you can start

@@ -228,7 +228,7 @@ const TranscriptLine = memo(function TranscriptLine({
       data-index={index}
       aria-current={active || undefined}
       onClick={() => onSeek(segment.start)}
-      className={`hover-fill hover-soft relative flex w-full gap-4 px-3 py-1.5 text-left text-body leading-relaxed ${
+      className={`hover-tint relative flex w-full gap-4 px-3 py-1.5 text-left text-body leading-relaxed ${
         ad ? "bg-ad-soft" : active ? "bg-surface-2" : ""
       } ${active ? "font-medium text-text" : ad || past ? "text-muted" : "text-text"} ${
         // The current line always carries an ink bar, even inside an ad, so you can see where you are.
@@ -274,7 +274,7 @@ function AdList() {
             <li key={`${ad.start}-${ad.end}`}>
               <button
                 onClick={() => seek(ad.start)}
-                className="hover-wave flex h-full w-full flex-col gap-1.5 overflow-hidden border-l-2 border-ad bg-ad-soft px-4 py-3.5 text-left"
+                className="flex h-full w-full flex-col gap-1.5 overflow-hidden border-l-2 border-ad bg-ad-soft px-4 py-3.5 text-left"
               >
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="truncate font-serif text-xl">{advertiser(ad)}</span>

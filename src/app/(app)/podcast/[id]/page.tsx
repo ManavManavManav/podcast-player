@@ -33,7 +33,7 @@ export default async function PodcastPage({ params }: Props) {
           src={podcast.image}
           alt=""
           priority
-          className="size-40 shrink-0 rounded-card sm:size-52"
+          className="size-40 shrink-0 sm:size-52"
         />
         <div className="min-w-0 space-y-3">
           <div>

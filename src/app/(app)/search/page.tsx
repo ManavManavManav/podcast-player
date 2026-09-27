@@ -44,7 +44,7 @@ async function Results({ q }: { q: string }) {
   const podcasts = await searchPodcasts(q, 36);
   if (podcasts.length === 0) {
     return (
-      <p className="rounded-3xl bg-surface p-10 text-center text-muted">
+      <p className="bg-surface p-10 text-center text-muted">
         No podcasts matched “{q}”. Try a shorter or different search.
       </p>
     );

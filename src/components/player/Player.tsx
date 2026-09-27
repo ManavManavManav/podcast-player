@@ -466,7 +466,7 @@ function PlayerBar() {
         <button className={`${word} shrink-0 text-xs`} aria-expanded={open} onClick={() => setPinned(!pinned)}>
           {open ? "Less" : "More"}
         </button>
-        <IconButton label="Close player" onClick={stop} size="sm" className="rounded-none">
+        <IconButton label="Close player" onClick={stop} size="sm">
           <X className="size-4" />
         </IconButton>
       </div>

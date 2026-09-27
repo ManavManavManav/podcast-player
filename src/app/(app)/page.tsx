@@ -34,7 +34,7 @@ async function Trending() {
   const podcasts = await trendingPodcasts(24).catch(() => null);
   if (!podcasts) {
     return (
-      <p className="rounded-3xl bg-surface p-8 text-center text-sm text-muted">
+      <p className="bg-surface p-8 text-center text-sm text-muted">
         Couldn&apos;t load trending podcasts. Check your Podcast Index API keys and connection.
       </p>
     );

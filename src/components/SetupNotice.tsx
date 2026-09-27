@@ -39,7 +39,7 @@ export function SetupNotice({ isAdmin }: { isAdmin: boolean }) {
             <li key={p}>{p}</li>
           ))}
         </ul>
-        <button onClick={() => setDismissed(true)} className="touch-target relative rounded p-0.5 hover:bg-ad/15" aria-label="Dismiss">
+        <button onClick={() => setDismissed(true)} className="touch-target relative p-0.5 hover:bg-ad/15" aria-label="Dismiss">
           <X className="size-4" />
         </button>
       </div>

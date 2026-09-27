@@ -64,8 +64,8 @@ function RecentCard({ episode }: { episode: Episode }) {
   const toggle = usePlayer((s) => s.toggle);
   const progress = useEpisodeProgress(episode);
   return (
-    <li className="flex items-center gap-4 rounded-card bg-surface p-4 sm:gap-5 sm:p-5">
-      <Artwork src={episode.image} alt="" className="size-16 shrink-0 rounded-art sm:size-[92px]" />
+    <li className="flex items-center gap-4 bg-surface p-4 sm:gap-5 sm:p-5">
+      <Artwork src={episode.image} alt="" className="size-16 shrink-0 sm:size-[92px]" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link href={`/podcast/${episode.podcastId}`} className="truncate text-meta text-faint hover:text-text">
           {episode.podcastTitle}

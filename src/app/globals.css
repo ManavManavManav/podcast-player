@@ -86,10 +86,6 @@
   --tracking-heading: -0.01em;
   --tracking-display: -0.02em;
 
-  /* Radii: cards and the artwork inside them. */
-  --radius-card: 22px;
-  --radius-art: 14px;
-
   /* Easing: a spring for presses, a soft ease-out for things arriving. */
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
@@ -268,15 +264,9 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
-   Press: controls sink a pixel while held. Hover is a strike-through (on the
-   buttons themselves), not motion.
-   .hover-wave  a soft sheen sweeps across once (cards, rows).
-   .hover-fill  the hover background flows in from the left (lists).
+   Press: controls sink a pixel while held. Hover changes things at once
+   (a strike-through on words, a tint on rows); nothing slides.
    ------------------------------------------------------------------------- */
-
-:root {
-  --sheen: color-mix(in srgb, var(--text) 7%, transparent);
-}
 
 .press,
 .hover-breathe {
@@ -291,52 +281,13 @@ body {
   translate: 0 1px;
 }
 
-.hover-wave {
-  position: relative;
-  isolation: isolate;
-}
-.hover-wave::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(105deg, transparent 35%, var(--sheen) 50%, transparent 65%);
-  opacity: 0;
-  transform: translateX(-100%);
-}
-
-.hover-fill {
-  background-image: linear-gradient(var(--surface-2), var(--surface-2));
-  background-repeat: no-repeat;
-  background-size: 0% 100%;
-  transition: background-size 240ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-/* A lighter hover, for rows where a solid surface-2 already means "current". */
-.hover-fill.hover-soft {
-  --hover-tint: color-mix(in srgb, var(--surface-2) 55%, transparent);
-  background-image: linear-gradient(var(--hover-tint), var(--hover-tint));
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .hover-wave:hover::after {
-    animation: wave 750ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .hover-fill:hover {
-    background-size: 100% 100%;
-  }
-}
-
-@keyframes wave {
-  0% {
-    opacity: 1;
-    transform: translateX(-100%);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(100%);
-  }
+/* A light tint on hover, over whatever background the row already has
+   (surface-2 means "current", so the hover stays lighter than that). */
+.hover-tint:hover {
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--surface-2) 55%, transparent),
+    color-mix(in srgb, var(--surface-2) 55%, transparent)
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -345,9 +296,5 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
-  }
-  /* A near-zero duration would make the sheen flash. */
-  .hover-wave:hover::after {
-    animation: none !important;
   }
 }

@@ -35,7 +35,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
   };
 
   return (
-    <section className="rounded-3xl bg-surface p-6 sm:p-8">
+    <section className="bg-surface p-6 sm:p-8">
       <h2 className="font-serif text-3xl">Account</h2>
       <dl className="mt-4 grid grid-cols-[6rem_1fr] gap-y-2 text-sm">
         <dt className="text-muted">Name</dt>

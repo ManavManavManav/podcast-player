@@ -106,7 +106,7 @@ interface Member {
 
 const BAY_CELLS = 4;
 
-/** A scaffold filling a rounded rectangle: posts, the ledgers across them, and the odd diagonal brace. */
+/** A scaffold filling a rectangle (corners rounded by `radius`, 0 for square): posts, the ledgers across them, and the odd diagonal brace. */
 function scaffold(rect: DOMRect, radius: number): { members: Member[]; levels: number; bays: number } {
   const inside = (x: number, y: number) => {
     const dx = Math.max(rect.left + radius - x, x - (rect.right - radius), 0);
@@ -144,7 +144,7 @@ function scaffold(rect: DOMRect, radius: number): { members: Member[]; levels: n
 const STAGE = { post: 0, ledger: 0.45, brace: 0.85 } as const;
 
 function makeSticks(target: DOMRect): Stick[] {
-  const { members, levels, bays } = scaffold(target, 24);
+  const { members, levels, bays } = scaffold(target, 0);
   // Each bay's crew starts at its own time and works at its own pace.
   const crews = Array.from({ length: bays }, () => ({ start: Math.random() * 0.25, pace: 0.75 + Math.random() * 0.5 }));
   const raw = members.map((m) => {
@@ -206,7 +206,7 @@ export function PlayBurst() {
           const rect = barRect();
           if (rect.top !== target.top || rect.left !== target.left || rect.width !== target.width) {
             target = rect;
-            const fresh = scaffold(rect, 24).members;
+            const fresh = scaffold(rect, 0).members;
             sticks = sticks.slice(0, fresh.length);
             sticks.forEach((d, i) => {
               ({ x: d.tx, y: d.ty, angle: d.angle, length: d.length } = fresh[i]);

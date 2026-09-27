@@ -60,7 +60,7 @@ export function AdminPanel({ initial, selfId }: { initial: AdminUser[]; selfId: 
       )}
       {notice && <p className="border-l-2 border-text bg-surface-2 px-3 py-2 text-sm">{notice}</p>}
 
-      <ul className="divide-y divide-border overflow-hidden rounded-3xl bg-surface px-2">
+      <ul className="divide-y divide-border overflow-hidden bg-surface px-2">
         {users.map((user) => {
           const self = user.id === selfId;
           const button = (action: Action, label: string, danger = false) => (

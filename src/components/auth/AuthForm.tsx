@@ -56,7 +56,7 @@ export function AuthForm({
   };
 
   return (
-    <div className="rounded-3xl bg-surface p-6 sm:p-8">
+    <div className="bg-surface p-6 sm:p-8">
       <h1 className="font-serif text-3xl tracking-heading">{signup ? "Create your account" : "Sign in"}</h1>
       <p className="mt-2 text-sm text-muted">
         {signup
