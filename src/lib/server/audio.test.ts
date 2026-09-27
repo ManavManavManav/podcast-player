@@ -180,9 +180,15 @@ describe("extractWindow", () => {
   ])("places the window exactly in %s (it %s)", async (name) => {
     const flac = await extractWindow(`${base}/${name}?exact=${Math.random()}`, 95, 10);
     expect(Math.abs((beepAt(flac) ?? Infinity) - 5)).toBeLessThan(0.1);
-    const offsetRanges = requests.filter((r) => r.range && !/^bytes=0-\d*$/.test(r.range));
-    if (name === "beep-cbr.mp3") expect(offsetRanges.length).toBeGreaterThan(0);
-    else expect(offsetRanges).toEqual([]);
+    // ffmpeg's own requests are open-ended ("bytes=N-"); the probe's have an end.
+    const ffmpegRanges = requests.map((r) => r.range ?? "").filter((range) => /^bytes=\d+-$/.test(range));
+    if (name === "beep-cbr.mp3") {
+      expect(ffmpegRanges.some((range) => range !== "bytes=0-")).toBe(true);
+    } else {
+      // Reads from the start. (A later offset can appear when ffmpeg reconnects
+      // mid-read and resumes where it was; that's still reading in order.)
+      expect(ffmpegRanges[0]).toBe("bytes=0-");
+    }
   });
 
   it("doesn't probe the file for the first window, and probes each file once", async () => {

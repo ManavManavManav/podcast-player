@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
+      # Report each Node version on its own rather than cancelling the other.
+      fail-fast: false
       matrix:
         # The oldest Node the app supports (package.json engines) and the one it runs on (.nvmrc).
         node: ["22", "24"]
