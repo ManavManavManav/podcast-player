@@ -185,6 +185,21 @@ describe("useAdScanner", () => {
     expect(asked(0)).toBe(1);
   });
 
+  it("waits out rate limits for as long as they last, without giving up", async () => {
+    vi.useFakeTimers();
+    renderHook(() => useAdScanner(true));
+    await flush();
+    await answer(300, 200);
+    for (let i = 0; i < 4; i++) {
+      await answer(0, 503, { error: "Hourly limit", code: "rate_limit" }, { "Retry-After": "102" });
+      await act(() => vi.advanceTimersByTimeAsync(101_000));
+      expect(asked(0)).toBe(0);
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+    }
+    expect(useAnalysis.getState().error).toBeNull();
+    expect(asked(0)).toBe(1);
+  });
+
   it("stops straight away when the server isn't set up for ad detection", async () => {
     renderHook(() => useAdScanner(true));
     await flush();

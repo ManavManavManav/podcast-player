@@ -11,7 +11,7 @@ const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const baseDelay = () => 1_000 + Math.random() * 1_000;
 
 /** Retry-After as milliseconds from now: either seconds, or an HTTP date. */
-function retryAfterMs(res: Response): number | null {
+export function retryAfterMs(res: Response): number | null {
   const value = res.headers.get("retry-after");
   if (!value) return null;
   const seconds = Number(value);

@@ -93,4 +93,20 @@ describe("transcribe", () => {
     await expect(transcribe(Buffer.from("x"), 0, 300, undefined, config)).rejects.toThrow(/401/);
     expect(unauthorized).toHaveBeenCalledTimes(1);
   });
+
+  it("reports a rate limit it can't wait out, with how long until it resets", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          { error: { message: "Rate limit reached for model `whisper-large-v3-turbo`" } },
+          { status: 429, headers: { "retry-after": "102" } },
+        ),
+      ),
+    );
+    const err = await transcribe(Buffer.from("x"), 0, 300, undefined, config).catch((e) => e);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.kind).toBe("rate_limit");
+    expect(err.retryAfterMs).toBe(102_000);
+  });
 });

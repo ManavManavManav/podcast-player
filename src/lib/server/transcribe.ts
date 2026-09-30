@@ -1,7 +1,7 @@
 import type { TranscriptSegment } from "@/lib/types";
 import type { ApiConfig } from "@/lib/server/config";
 import { AppError } from "@/lib/server/errors";
-import { fetchWithRetry } from "@/lib/server/retry";
+import { fetchWithRetry, retryAfterMs } from "@/lib/server/retry";
 
 /**
  * Speech-to-text through any OpenAI-compatible `/audio/transcriptions`
@@ -12,6 +12,8 @@ import { fetchWithRetry } from "@/lib/server/retry";
 /** Whisper's own "this is probably silence" score; above it, segments are usually hallucinated. */
 const NO_SPEECH_THRESHOLD = 0.8;
 const TIMEOUT_MS = 90_000;
+/** Wait after a rate limit that doesn't say how long: free tiers reset on a rolling hour. */
+const RATE_LIMIT_WAIT_MS = 60_000;
 
 interface VerboseSegment {
   start?: number;
@@ -78,6 +80,11 @@ export async function transcribe(
   const body = (await res.json().catch(() => ({}))) as VerboseTranscription;
   if (!res.ok) {
     const message = typeof body.error === "string" ? body.error : body.error?.message;
+    if (res.status === 429) {
+      throw new AppError("rate_limit", `Transcription rate limited: ${message ?? res.statusText}`, {
+        retryAfterMs: retryAfterMs(res) ?? RATE_LIMIT_WAIT_MS,
+      });
+    }
     throw new AppError("transcription", `Transcription failed (${res.status}): ${message ?? res.statusText}`);
   }
   if (!Array.isArray(body.segments)) {

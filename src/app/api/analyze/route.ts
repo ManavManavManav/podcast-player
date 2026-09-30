@@ -111,9 +111,10 @@ async function analyze(req: NextRequest) {
       return NextResponse.json(body, { status, headers: { "Retry-After": String(RETRY_AFTER_SECONDS) } });
     }
     // Full details for the log; the listener gets a message meant for them.
-    const { status, body } = publicError(err);
+    const { status, body, retryAfterSeconds } = publicError(err);
     log.error("analysis.failed", { window, userId: user.id, code: body.code, err: error });
-    return NextResponse.json(body, { status });
+    const headers = retryAfterSeconds === undefined ? undefined : { "Retry-After": String(retryAfterSeconds) };
+    return NextResponse.json(body, { status, headers });
   } finally {
     limit.clear();
   }

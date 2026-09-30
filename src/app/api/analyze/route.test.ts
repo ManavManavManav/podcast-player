@@ -137,6 +137,18 @@ describe("POST /api/analyze: failures", () => {
     expect(body.code).toBe("config");
     expect(body.error).not.toMatch(/DETECT_API_KEY/);
   });
+
+  it("passes on how long a rate limit lasts", async () => {
+    mocks.analyzeWindow.mockRejectedValue(
+      new AppError("rate_limit", "Transcription rate limited: ASPH", { retryAfterMs: 101_500 }),
+    );
+    const res = await POST(post({ url: AUDIO, window: 0 }));
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("102");
+    const body = await res.json();
+    expect(body.code).toBe("rate_limit");
+    expect(body.error).not.toMatch(/ASPH/);
+  });
 });
 
 describe("POST /api/analyze: time limit", () => {

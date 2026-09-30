@@ -151,8 +151,8 @@ export function useAdScanner(enabled: boolean) {
           analysis.setStatus(w, "error");
           // Retrying can't fix a server that isn't set up.
           if (code === "config") return analysis.setError(err.message);
-          // Running out of time under load isn't the service failing: keep at it.
-          if (code !== "timeout") failures.current += 1;
+          // Running out of time under load, or waiting out a rate limit, isn't the service failing: keep at it.
+          if (code !== "timeout" && code !== "rate_limit") failures.current += 1;
           if (failures.current >= MAX_CONSECUTIVE_ERRORS) {
             analysis.setError(err.message);
           } else {
